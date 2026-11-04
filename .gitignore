@@ -8,6 +8,7 @@
 venv/
 __pycache__/
 *.py[cod]
+*.pyc
 
 # Python testing and cache
 .pytest_cache/
@@ -30,3 +31,18 @@ npm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Allow the example environment file
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Testing
+.pytest_cache/
+
+# IDE
+.vscode/
