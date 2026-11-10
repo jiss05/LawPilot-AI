@@ -16,6 +16,7 @@ from app.models.document_chunk import DocumentChunk
 from app.models.user import User
 from app.models.role import Role
 from app.models.user_role import UserRole
+from app.models.email_otp import EmailOTP
 
 from app.models.matter import Matter
 from app.models.matter_member import MatterMember
@@ -27,6 +28,7 @@ __all__ = [
     "User",
     "Role",
     "UserRole",
+    "EmailOTP",
     "Matter",
     "MatterMember",
     "Conversation",
@@ -43,5 +45,4 @@ __all__ = [
     "AuditEvent",
     "EvaluationSet",
     "EvaluationResult",
-    
 ]
