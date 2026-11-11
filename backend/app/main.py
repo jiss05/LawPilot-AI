@@ -1,5 +1,6 @@
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth_routes import router as auth_router
 from app.api.user_routes import router as user_router
@@ -9,6 +10,14 @@ app = FastAPI(
     title="LawPilot AI",
     description="Multi-Agent AI Legal Support System",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1):517[0-9]+$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
