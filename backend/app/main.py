@@ -6,6 +6,8 @@ from app.api.auth_routes import router as auth_router
 from app.api.user_routes import router as user_router
 from app.api.dashboard_routes import router as dashboard_router
 
+from app.api.knowledge_source_routes import router as knowledge_source_router
+
 app = FastAPI(
     title="LawPilot AI",
     description="Multi-Agent AI Legal Support System",
@@ -35,3 +37,4 @@ def health_check():
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(dashboard_router)
+app.include_router(knowledge_source_router)

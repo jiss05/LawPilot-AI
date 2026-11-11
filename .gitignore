@@ -46,3 +46,6 @@ venv/
 
 # IDE
 .vscode/
+
+# Uploaded legal documents
+backend/legal_documents/
