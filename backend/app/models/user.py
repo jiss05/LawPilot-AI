@@ -1,7 +1,6 @@
-
 import uuid
-
 from datetime import datetime
+
 from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.dialects.postgresql import CITEXT, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -34,9 +33,21 @@ class User(Base):
         nullable=False,
     )
 
+    professional_id: Mapped[str | None] = mapped_column(
+        String(11),
+        unique=True,
+        nullable=True,
+    )
+
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
-        default=True,
+        default=False,
         nullable=False,
     )
 

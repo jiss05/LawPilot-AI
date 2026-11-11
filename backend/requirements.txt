@@ -1,8 +1,21 @@
+
 fastapi
 uvicorn[standard]
+
+# Database
 sqlalchemy
 alembic
 psycopg[binary]
+
+# Configuration
 python-dotenv
 pydantic-settings
+
+# Authentication and security
+pwdlib[argon2]
+PyJWT
+email-validator
+
+# Testing
 pytest
+httpx
