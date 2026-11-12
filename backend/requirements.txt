@@ -6,3 +6,9 @@ psycopg[binary]
 python-dotenv
 pydantic-settings
 pytest
+
+# Document ingestion: text extraction + OCR (Sprint 2)
+pymupdf
+python-docx
+pillow
+easyocr
