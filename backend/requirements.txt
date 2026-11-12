@@ -1,8 +1,28 @@
+
 fastapi
 uvicorn[standard]
+
+# Database
 sqlalchemy
 alembic
 psycopg[binary]
+
+# Configuration
 python-dotenv
 pydantic-settings
 pytest
+
+# Document ingestion: text extraction + OCR (Sprint 2)
+pymupdf
+python-docx
+pillow
+easyocr
+
+# Authentication and security
+pwdlib[argon2]
+PyJWT
+email-validator
+
+# Testing
+pytest
+httpx
