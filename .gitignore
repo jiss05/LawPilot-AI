@@ -48,3 +48,6 @@ venv/
 .vscode/
 # Ingested legal documents and extraction output (never commit)
 backend/storage/
+
+# Uploaded legal documents
+backend/legal_documents/
