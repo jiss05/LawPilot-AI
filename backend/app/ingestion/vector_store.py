@@ -87,6 +87,9 @@ def get_qdrant_client(settings: IngestionSettings):
                     url=url,
                     api_key=settings.qdrant_api_key,
                     timeout=settings.qdrant_timeout_seconds,
+                    # The docker-compose image tracks "latest"; skip the strict
+                    # client/server version handshake (we only use stable APIs).
+                    check_compatibility=False,
                 )
         return _clients[url]
 
