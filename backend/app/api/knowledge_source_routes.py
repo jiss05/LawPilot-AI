@@ -54,10 +54,21 @@ async def create_legal_source(
     canonical_url: str | None = Form(None),
     version_label: str | None = Form(None),
     published_at: date | None = Form(None),
+    # Who may retrieve this document (see app/rag/filters.py):
+    #   public   - every logged-in user (approved legal sources, BRD FR-020)
+    #   internal - lawyers, judge-support users and admins only
+    #   private  - the uploader and admins only
+    visibility: str = Form("public"),
     file: UploadFile = File(...),
     current_user: User = Depends(require_roles("ADMIN")),
     db: Session = Depends(get_db),
 ):
+    if visibility not in ("public", "internal", "private"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="visibility must be public, internal or private.",
+        )
+
     if file.filename is None or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -86,6 +97,7 @@ async def create_legal_source(
             original_filename=file.filename,
             file_content=file_content,
             uploaded_by=current_user.id,
+            visibility=visibility,
         )
 
         # Start text extraction + cleaning + chunking AFTER the response

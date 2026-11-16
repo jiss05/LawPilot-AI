@@ -40,6 +40,7 @@ def register_legal_source(
     original_filename: str,
     file_content: bytes,
     uploaded_by,
+    visibility: str = "public",
 ):
     """
     Register a legal source and its PDF document.
@@ -111,7 +112,7 @@ def register_legal_source(
             sha256=content_hash,
             uploaded_by=uploaded_by,
             processing_status=DocumentStatus.UPLOADED,
-            visibility="internal",
+            visibility=visibility,
         )
 
         db.add(document)

@@ -7,6 +7,7 @@ from app.api.user_routes import router as user_router
 from app.api.dashboard_routes import router as dashboard_router
 
 from app.api.knowledge_source_routes import router as knowledge_source_router
+from app.api.research_routes import router as research_router
 
 app = FastAPI(
     title="LawPilot AI",
@@ -38,3 +39,4 @@ app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(dashboard_router)
 app.include_router(knowledge_source_router)
+app.include_router(research_router)
