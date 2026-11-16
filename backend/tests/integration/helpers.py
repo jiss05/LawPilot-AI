@@ -49,14 +49,21 @@ def ingest_statute(
     visibility: str = "public",
     activate: bool = True,
     pdf: Path | None = None,
+    source: KnowledgeSource | None = None,
+    version_label: str = "As amended 2023",
+    amendment: str | None = None,
 ):
-    """Register a source + edition + document, then run the real pipeline."""
-    source = KnowledgeSource(title=title, source_type=source_type, jurisdiction="India",
-                             trust_tier="official", publisher="Legislative Department",
-                             canonical_url="https://www.indiacode.nic.in/example")
-    db.add(source)
-    db.flush()
-    version = SourceVersion(source_id=source.id, version_label="As amended 2023",
+    """
+    Register a source (or a new edition of `source`) + document, then run the
+    real pipeline: extraction, chunking, indexing and (if activate) activation.
+    """
+    if source is None:
+        source = KnowledgeSource(title=title, source_type=source_type, jurisdiction="India",
+                                 trust_tier="official", publisher="Legislative Department",
+                                 canonical_url="https://www.indiacode.nic.in/example")
+        db.add(source)
+        db.flush()
+    version = SourceVersion(source_id=source.id, version_label=version_label,
                             content_hash=uuid.uuid4().hex, status="pending")
     db.add(version)
     db.flush()
@@ -64,7 +71,7 @@ def ingest_statute(
     settings.storage_dir.mkdir(parents=True, exist_ok=True)
     stored = settings.storage_dir / f"{document_id}.pdf"
     if pdf is None:
-        make_statute_pdf(stored)
+        make_statute_pdf(stored, amendment)
     else:
         stored.write_bytes(pdf.read_bytes())
     document = KnowledgeDocument(
@@ -75,6 +82,7 @@ def ingest_statute(
     db.add(document)
     db.commit()
 
+    import app.ingestion.activation as ap
     import app.ingestion.chunk_pipeline as cp
     import app.ingestion.index_pipeline as ip
     from app.ingestion import pipeline as ep
@@ -88,8 +96,9 @@ def ingest_statute(
     jobs.append(ip.run_indexing(db, document.id, admin.id, settings=settings))
     assert all(j.status == "completed" for j in jobs), [j.error_summary for j in jobs]
 
-    if activate:  # what SCRUM-18 activation does
-        version.status = "active"
-        document.processing_status = "completed"
-        db.commit()
+    if activate:
+        job = ap.run_activation(db, document.id, admin.id, settings=settings)
+        assert job.status == "completed", job.error_summary
+    db.refresh(version)
+    db.refresh(document)
     return source, version, document

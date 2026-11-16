@@ -121,12 +121,15 @@ LONG_SECTION_BODY = " ".join(
 )
 
 
-def make_statute_pdf(path: Path) -> Path:
+def make_statute_pdf(path: Path, amendment: str | None = None) -> Path:
     """
     A 3-page statute-style PDF like the ones from India Code: a running
     header on every page, "- n -" page numbers, chapters, sections,
     sub-sections, clauses, an Explanation, and Section 73 long enough to be
     split and running from page 2 onto page 3.
+
+    `amendment` adds one more paragraph on page 3, to build a NEW EDITION
+    of the same Act for versioning tests.
     """
     pages = [
         ["CHAPTER I", "PRELIMINARY",
@@ -141,7 +144,8 @@ def make_statute_pdf(path: Path) -> Path:
         [LONG_SECTION_BODY[900:],
          "Explanation. - In estimating the loss, the means which existed of remedying the inconvenience must be taken into account.",
          "74. Compensation for breach of contract where penalty stipulated for. - When a contract has been broken, "
-         "the party complaining of the breach is entitled to reasonable compensation."],
+         "the party complaining of the breach is entitled to reasonable compensation."]
+        + ([amendment] if amendment else []),
     ]
     document = pymupdf.open()
     for number, paragraphs in enumerate(pages, start=1):

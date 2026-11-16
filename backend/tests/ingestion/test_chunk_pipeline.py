@@ -181,21 +181,23 @@ class FakeJob:
 
 def test_process_document_runs_each_stage_only_after_the_previous_succeeds(monkeypatch):
     calls = []
+    monkeypatch.setattr("app.ingestion.activation.run_activation", lambda db, d, u: calls.append("activate") or FakeJob("activation", JobStatus.COMPLETED))
+    monkeypatch.setattr(tasks, "_mark_edition_failed_if_needed", lambda db, d: calls.append("mark_failed"))
     monkeypatch.setattr(tasks, "run_extraction", lambda db, d, u: calls.append("extract") or FakeJob("text_extraction", JobStatus.COMPLETED))
     monkeypatch.setattr("app.ingestion.chunk_pipeline.run_chunking", lambda db, d, u: calls.append("chunk") or FakeJob("chunking", JobStatus.COMPLETED))
     monkeypatch.setattr("app.ingestion.index_pipeline.run_indexing", lambda db, d, u: calls.append("index") or FakeJob("indexing", JobStatus.COMPLETED))
     tasks.process_document(None, uuid.uuid4(), uuid.uuid4())
-    assert calls == ["extract", "chunk", "index"]
+    assert calls == ["extract", "chunk", "index", "activate"]
 
     calls.clear()
     monkeypatch.setattr("app.ingestion.chunk_pipeline.run_chunking", lambda db, d, u: calls.append("chunk") or FakeJob("chunking", JobStatus.FAILED))
     tasks.process_document(None, uuid.uuid4(), uuid.uuid4())
-    assert calls == ["extract", "chunk"]  # no indexing after a failed chunking
+    assert calls == ["extract", "chunk", "mark_failed"]  # stops; edition marked failed
 
     calls.clear()
     monkeypatch.setattr(tasks, "run_extraction", lambda db, d, u: calls.append("extract") or FakeJob("text_extraction", JobStatus.FAILED))
     tasks.process_document(None, uuid.uuid4(), uuid.uuid4())
-    assert calls == ["extract"]  # corrupted/empty files are not chunked
+    assert calls == ["extract", "mark_failed"]  # corrupted/empty files are not chunked
 
 
 def test_background_task_never_raises(monkeypatch):
