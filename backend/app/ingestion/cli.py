@@ -15,8 +15,13 @@ Run from the `backend` folder (with your virtual environment active):
   #    ...skip OCR (fast check of the native text layer only)
   python -m app.ingestion.cli extract scan.pdf --no-ocr
 
-  # 2) Run the real pipeline for a knowledge_documents row (needs Postgres
-  #    and DATABASE_URL in backend/.env). Records the ingestion job.
+  # 2) Preview cleaning + chunking of any file - NO database needed.
+  python -m app.ingestion.cli chunk path\\to\\act.pdf
+  python -m app.ingestion.cli chunk path\\to\\judgment.pdf --source-type judgment --show-text 200
+
+  # 3) Run the real pipeline (extraction + chunking) for a knowledge_documents
+  #    row (needs Postgres and DATABASE_URL in backend/.env). Uploads through
+  #    the API do this automatically; use this to re-run a document by hand.
   python -m app.ingestion.cli run <document_uuid> --user <admin_user_uuid>
 
 Why `python -m app.ingestion.cli` and not `python app/ingestion/cli.py`?
@@ -86,20 +91,60 @@ def cmd_extract(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_chunk(args: argparse.Namespace) -> int:
+    from app.ingestion.chunking import chunk_document
+    from app.ingestion.chunking.structure import mode_for_source_type
+
+    settings = get_ingestion_settings()
+    if args.no_ocr:
+        settings = settings.model_copy(update={"ocr_enabled": False})
+    try:
+        result = DocumentExtractor(settings).extract(Path(args.file))
+    except ExtractionError as exc:
+        print(f"\nEXTRACTION FAILED: {exc}")
+        return 1
+
+    chunking = chunk_document(
+        result,
+        mode_for_source_type(args.source_type),
+        max_tokens=settings.chunk_max_tokens,
+        overlap_tokens=settings.chunk_overlap_tokens,
+        min_tokens=settings.chunk_min_tokens,
+        header_footer_min_ratio=settings.header_footer_min_ratio,
+    )
+
+    print("\n=== Chunking summary ===")
+    for key, value in chunking.summary().items():
+        print(f"  {key:<16} {value}")
+    print("\n=== Chunks ===")
+    print(f"  {'#':>3}  {'section_ref':<18} {'pages':<8} {'tokens':>6}  part  heading_path")
+    for c in chunking.chunks:
+        pages = "-" if c.page_start is None else (
+            str(c.page_start) if c.page_start == c.page_end else f"{c.page_start}-{c.page_end}")
+        part = f"{c.part}/{c.parts}"
+        print(f"  {c.chunk_index:>3}  {str(c.section_ref or '-'):<18} {pages:<8} {c.token_count:>6}  "
+              f"{part:<4}  {' > '.join(c.heading_path)}")
+        if args.show_text:
+            print("       > " + c.text[: args.show_text].replace("\n", " | "))
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     # Imported here because app.db.session needs DATABASE_URL at import
     # time; the `extract` command must work without a database.
     from app.db.session import SessionLocal
     import app.models  # noqa: F401  (registers every model for foreign keys)
-    from app.ingestion.pipeline import JobStatus, run_extraction
+    from app.ingestion.pipeline import JobStatus
+    from app.ingestion.tasks import process_document
 
     with SessionLocal() as db:
-        job = run_extraction(db, UUID(args.document_id), UUID(args.user))
-        print(f"Ingestion job {job.id}: {job.status}")
-        if job.error_summary:
-            print(f"Error: {job.error_summary}")
-        print(json.dumps(job.counts, indent=2, default=str))
-        return 0 if job.status == JobStatus.COMPLETED else 1
+        jobs = process_document(db, UUID(args.document_id), UUID(args.user))
+        for job in jobs:
+            print(f"\nIngestion job {job.id} ({job.counts.get('stage')}): {job.status}")
+            if job.error_summary:
+                print(f"Error: {job.error_summary}")
+            print(json.dumps(job.counts, indent=2, default=str))
+        return 0 if all(j.status == JobStatus.COMPLETED for j in jobs) and len(jobs) == 2 else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -118,7 +163,16 @@ def main(argv: list[str] | None = None) -> int:
     p_extract.add_argument("--output", help="write the full JSON result here")
     p_extract.set_defaults(func=cmd_extract)
 
-    p_run = sub.add_parser("run", help="run the pipeline for a knowledge_documents row")
+    p_chunk = sub.add_parser("chunk", help="extract + clean + chunk a local file (no database)")
+    p_chunk.add_argument("file")
+    p_chunk.add_argument("--source-type", default="statute",
+                         help="statute (default) or judgment - decides how '12.' is read")
+    p_chunk.add_argument("--no-ocr", action="store_true", help="disable OCR")
+    p_chunk.add_argument("--show-text", type=int, default=0, metavar="N",
+                         help="print the first N characters of each chunk")
+    p_chunk.set_defaults(func=cmd_chunk)
+
+    p_run = sub.add_parser("run", help="extraction + chunking for a knowledge_documents row")
     p_run.add_argument("document_id")
     p_run.add_argument("--user", required=True, help="UUID of the initiating admin")
     p_run.set_defaults(func=cmd_run)
