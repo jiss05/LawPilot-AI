@@ -90,8 +90,9 @@ def test_new_edition_supersedes_old_one_and_old_one_is_preserved(db, settings, a
     client_user = make_user(db, "CLIENT")
     texts = search_texts(db, settings, client_user, "interest on delayed payment")
     assert any("Interest on delayed payment" in t for t in texts)
-    results = LegalSearchService(settings).search(db, "penalty stipulated", access=access_context_for(client_user))
-    assert {r.source.document_id for r in results.results} == {doc2.id}
+    results = LegalSearchService(settings).search(db, "penalty stipulated", access=access_context_for(client_user), top_k=50)
+    found = {r.source.document_id for r in results.results}
+    assert doc2.id in found and doc1.id not in found
 
 
 def test_admin_can_roll_back_to_previous_edition(api, db, settings, admin):
@@ -114,13 +115,15 @@ def test_admin_can_roll_back_to_previous_edition(api, db, settings, admin):
 def test_withdrawn_edition_disappears_from_search_but_is_kept(api, db, settings, admin):
     source, v1, doc = ingest_statute(db, settings, admin)
     client_user = make_user(db, "CLIENT")
-    assert search_texts(db, settings, client_user, "penalty stipulated")
+    found = lambda: {r.source.document_id for r in LegalSearchService(settings).search(  # noqa: E731
+        db, "penalty stipulated", access=access_context_for(client_user), top_k=50).results}
+    assert doc.id in found()
 
     response = api.post(f"/api/v1/knowledge-sources/{source.id}/versions/{v1.id}/withdraw",
                         json={"reason": "published in error"}, headers=auth(admin))
     assert response.status_code == 200
     assert response.json()["version"]["status"] == "withdrawn"
-    assert search_texts(db, settings, client_user, "penalty stipulated") == []
+    assert doc.id not in found()
     assert db.get(SourceVersion, v1.id) is not None  # nothing deleted
 
 

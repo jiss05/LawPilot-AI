@@ -35,6 +35,12 @@ def search(db, settings, user, query, **kwargs):
     return LegalSearchService(settings).search(db, query, access=access_context_for(user), **kwargs)
 
 
+def docs_found(db, settings, user, query, **kwargs):
+    """Document ids in the results. Tests compare against THEIR OWN documents,
+    so they also pass on a development database that already holds data."""
+    return {r.source.document_id for r in search(db, settings, user, query, top_k=50, **kwargs).results}
+
+
 def test_keyword_channel_finds_exact_legal_terms(db, settings, admin, client_user):
     ingest_statute(db, settings, admin)
     hits = keyword_candidates(db, "penalty stipulated", access_context_for(client_user), None, 5)
@@ -80,34 +86,34 @@ def test_source_information_returned(db, settings, admin, client_user):
 
 
 def test_metadata_filters(db, settings, admin, client_user):
-    ingest_statute(db, settings, admin)
+    _, _, doc = ingest_statute(db, settings, admin)
     only_judgments = MetadataFilters(source_types=frozenset({"judgment"}))
-    assert search(db, settings, client_user, "compensation", filters=only_judgments).results == []
+    assert doc.id not in docs_found(db, settings, client_user, "compensation", filters=only_judgments)
     other_country = MetadataFilters(jurisdictions=frozenset({"Singapore"}))
-    assert search(db, settings, client_user, "compensation", filters=other_country).results == []
+    assert doc.id not in docs_found(db, settings, client_user, "compensation", filters=other_country)
     india = MetadataFilters(jurisdictions=frozenset({"India"}))
-    assert search(db, settings, client_user, "compensation", filters=india).results
+    assert doc.id in docs_found(db, settings, client_user, "compensation", filters=india)
 
 
 def test_internal_documents_hidden_from_clients(db, settings, admin, client_user, lawyer):
-    ingest_statute(db, settings, admin, visibility="internal")
-    assert search(db, settings, client_user, "compensation").results == []
-    assert search(db, settings, lawyer, "compensation").results
-    assert search(db, settings, admin, "compensation").results
+    _, _, doc = ingest_statute(db, settings, admin, visibility="internal")
+    assert doc.id not in docs_found(db, settings, client_user, "compensation")
+    assert doc.id in docs_found(db, settings, lawyer, "compensation")
+    assert doc.id in docs_found(db, settings, admin, "compensation")
 
 
 def test_private_documents_only_for_uploader_and_admin(db, settings, admin, client_user, lawyer):
-    ingest_statute(db, settings, lawyer, visibility="private")  # lawyer uploaded it
-    assert search(db, settings, lawyer, "compensation").results
-    assert search(db, settings, client_user, "compensation").results == []
-    assert search(db, settings, admin, "compensation").results
+    _, _, doc = ingest_statute(db, settings, lawyer, visibility="private")  # lawyer uploaded it
+    assert doc.id in docs_found(db, settings, lawyer, "compensation")
+    assert doc.id not in docs_found(db, settings, client_user, "compensation")
+    assert doc.id in docs_found(db, settings, admin, "compensation")
 
 
 def test_unactivated_versions_are_never_returned(db, settings, admin, client_user):
-    ingest_statute(db, settings, admin, activate=False)  # indexed, but still "pending"
+    _, _, doc = ingest_statute(db, settings, admin, activate=False)  # indexed, but still "pending"
     response = search(db, settings, client_user, "compensation")
-    assert response.vector_candidates > 0      # Qdrant has the vectors ...
-    assert response.results == []              # ... but inactive editions are filtered out
+    assert response.vector_candidates > 0                 # Qdrant has the vectors ...
+    assert doc.id not in docs_found(db, settings, client_user, "compensation")  # ... but they are filtered out
 
 
 def test_vector_store_down_degrades_to_keyword_search(db, settings, admin, client_user):
