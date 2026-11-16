@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -20,6 +21,7 @@ from app.schemas.knowledge_source import (
     KnowledgeSourceResponse,
     KnowledgeDocumentResponse,
 )
+from app.ingestion.tasks import process_uploaded_document
 from app.services.knowledge_source_service import (
     register_legal_source,
     get_legal_sources,
@@ -40,6 +42,10 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_legal_source(
+    # FastAPI fills this in automatically (no default needed); it must come
+    # first because Python does not allow a parameter without a default
+    # after parameters that have one.
+    background_tasks: BackgroundTasks,
     title: str = Form(...),
     source_type: str = Form(...),
     jurisdiction: str = Form(...),
@@ -67,7 +73,7 @@ async def create_legal_source(
     file_content = await file.read(20 * 1024 * 1024 + 1)
 
     try:
-        source = register_legal_source(
+        source, document = register_legal_source(
             db,
             title=title,
             source_type=source_type,
@@ -80,6 +86,17 @@ async def create_legal_source(
             original_filename=file.filename,
             file_content=file_content,
             uploaded_by=current_user.id,
+        )
+
+        # Start text extraction + cleaning + chunking AFTER the response
+        # is sent. The admin gets "201 Created" immediately instead of
+        # waiting for OCR, and can follow progress through
+        # knowledge_documents.processing_status and ingestion_jobs.
+        # (FastAPI runs background tasks in the same server process; a
+        # dedicated job queue such as Celery can replace this later,
+        # BRD NFR-03.)
+        background_tasks.add_task(
+            process_uploaded_document, document.id, current_user.id
         )
 
         return source

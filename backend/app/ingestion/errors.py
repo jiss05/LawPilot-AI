@@ -41,6 +41,10 @@ class ExtractionErrorCode(str, Enum):
     OCR_UNAVAILABLE = "OCR_UNAVAILABLE"        # easyocr not installed / disabled
     OCR_FAILED = "OCR_FAILED"
 
+    # --- chunking problems (Sprint 2: cleaning and chunking story) ---
+    NO_EXTRACTION_OUTPUT = "NO_EXTRACTION_OUTPUT"  # chunking ran before extraction
+    NO_CHUNKS_PRODUCED = "NO_CHUNKS_PRODUCED"      # nothing left after cleaning
+
     # --- anything we did not expect (a bug or an environment problem) ---
     UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
 

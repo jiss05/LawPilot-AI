@@ -6,15 +6,22 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ingestion.config import get_ingestion_settings
+from app.ingestion.pipeline import DocumentStatus
 from app.models.knowledge_source import KnowledgeSource
 from app.models.source_version import SourceVersion
 from app.models.knowledge_document import KnowledgeDocument
 
 
-# backend/legal_documents/
-DOCUMENT_DIRECTORY = (
-    Path(__file__).resolve().parents[2] / "legal_documents"
-)
+def _document_directory() -> Path:
+    """
+    Folder where uploaded files are saved (default: backend/legal_documents/).
+
+    Sprint 2 fix: this used to be hard-coded here while the extraction step
+    looked in a different folder, so extraction could not find uploads.
+    Both now read the same setting, INGESTION_STORAGE_DIR.
+    """
+    return get_ingestion_settings().storage_dir
 
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 
@@ -34,7 +41,11 @@ def register_legal_source(
     file_content: bytes,
     uploaded_by,
 ):
-    """Register a legal source and its PDF document."""
+    """
+    Register a legal source and its PDF document.
+
+    Returns (source, document).
+    """
 
     if len(file_content) > MAX_FILE_SIZE:
         raise ValueError("PDF file must not exceed 20 MB.")
@@ -42,18 +53,21 @@ def register_legal_source(
     if not file_content.startswith(b"%PDF-"):
         raise ValueError("The uploaded file is not a valid PDF.")
 
-    DOCUMENT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    document_directory = _document_directory()
+    document_directory.mkdir(parents=True, exist_ok=True)
 
     document_id = uuid.uuid4()
     stored_filename = f"{document_id}.pdf"
-    file_path = DOCUMENT_DIRECTORY / stored_filename
+    file_path = document_directory / stored_filename
 
     content_hash = hashlib.sha256(file_content).hexdigest()
 
     safe_filename = original_filename.replace("\\", "/").split("/")[-1]
     safe_filename = safe_filename[:255]
 
-    storage_key = f"legal_documents/{stored_filename}"
+    # The storage key is relative to the storage folder, so the folder can
+    # move (or become cloud storage later) without changing database rows.
+    storage_key = stored_filename
 
     try:
         # Save the actual PDF file.
@@ -78,7 +92,9 @@ def register_legal_source(
             version_label=version_label,
             published_at=published_at,
             content_hash=content_hash,
-            status="active",
+            # "pending" until the ingestion pipeline has processed it.
+            # Activation (a later story) switches it to "active".
+            status="pending",
             raw_storage_key=storage_key,
         )
 
@@ -94,7 +110,7 @@ def register_legal_source(
             storage_key=storage_key,
             sha256=content_hash,
             uploaded_by=uploaded_by,
-            processing_status="pending",
+            processing_status=DocumentStatus.UPLOADED,
             visibility="internal",
         )
 
@@ -102,7 +118,9 @@ def register_legal_source(
         db.commit()
         db.refresh(source)
 
-        return source
+        # Return the document too: the API route needs its id to start
+        # extraction and chunking in the background.
+        return source, document
 
     except Exception:
         db.rollback()

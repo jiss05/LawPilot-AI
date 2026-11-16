@@ -29,8 +29,9 @@ status is "ready" or "completed". Every status set here is deliberately
 different, so a document that is only extracted (not yet chunked and
 embedded) can never appear in search results.
 
-NOTE: `ingestion_jobs` has no `document_id` column in the current schema,
-so we store it inside `counts["document_id"]`.
+`ingestion_jobs.knowledge_document_id` links each job to its file
+(added in migration c4d8e2f1a7b3). `counts["document_id"]` is kept too,
+so the JSON is self-describing when exported.
 """
 
 from __future__ import annotations
@@ -62,12 +63,15 @@ logger = logging.getLogger(__name__)
 class DocumentStatus:
     """Values for knowledge_documents.processing_status."""
 
-    UPLOADED = "uploaded"            # set by the upload story
+    UPLOADED = "pending"             # set by the upload API
     EXTRACTING = "extracting"        # extraction in progress
     EXTRACTED = "extracted"          # text ready for cleaning/chunking
     EMPTY = "empty"                  # no readable content
     CORRUPTED = "corrupted"          # damaged / mismatched / encrypted
     EXTRACTION_FAILED = "extraction_failed"  # any other failure
+    CHUNKING = "chunking"            # cleaning + chunking in progress
+    CHUNKED = "chunked"              # chunks saved in document_chunks
+    CHUNKING_FAILED = "chunking_failed"
 
 
 class JobStatus:
@@ -121,6 +125,7 @@ def run_extraction(
     job = IngestionJob(
         source_id=source_version.source_id if source_version else None,
         source_version_id=document.source_version_id,
+        knowledge_document_id=document.id,
         status=JobStatus.RUNNING,
         started_at=_now(),
         initiated_by=initiated_by,

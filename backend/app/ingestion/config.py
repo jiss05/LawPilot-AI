@@ -30,6 +30,11 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# The `backend/` folder, worked out from this file's own location
+# (backend/app/ingestion/config.py -> three levels up). Using it for the
+# defaults means the paths are the same no matter which folder you start
+# uvicorn, pytest or the CLI from.
+BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 class IngestionSettings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -42,14 +47,16 @@ class IngestionSettings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Storage
     # ------------------------------------------------------------------ #
-    # Folder where the original uploaded files are kept. The
-    # `knowledge_documents.storage_key` column holds a path RELATIVE to
-    # this folder, e.g. "acts/ipc_1860.pdf".
-    storage_dir: Path = Path("storage/documents")
+    # Folder where the original uploaded files are kept. The upload API
+    # (app/services/knowledge_source_service.py) saves files here, and the
+    # `knowledge_documents.storage_key` column holds the file name RELATIVE
+    # to this folder, e.g. "3f6c2a9e-....pdf".
+    # (Sprint 2 fix: upload and extraction now share this one setting.)
+    storage_dir: Path = BACKEND_DIR / "legal_documents"
 
     # Folder where the page-by-page extraction output (JSON) is saved.
-    # The chunking story will read these files next sprint.
-    extracted_dir: Path = Path("storage/extracted")
+    # The chunking step reads these files.
+    extracted_dir: Path = BACKEND_DIR / "storage" / "extracted"
 
     # ------------------------------------------------------------------ #
     # File validation limits (BRD §12: "enforce file-size and page-count
@@ -87,6 +94,26 @@ class IngestionSettings(BaseSettings):
     # Average OCR confidence (0..1) below which we attach a warning so an
     # administrator can review the page (BRD §17: "OCR quality checks").
     ocr_low_confidence_warning: float = 0.5
+
+    # ------------------------------------------------------------------ #
+    # Chunking (see app/ingestion/chunking/)
+    # ------------------------------------------------------------------ #
+    # Target maximum size of one chunk, in APPROXIMATE tokens. A "token" is
+    # the unit language models count in; for English, 1 token is roughly
+    # 4 characters or 3/4 of a word. We estimate instead of counting
+    # exactly because the embedding model is not chosen yet.
+    chunk_max_tokens: int = 400
+    # When a long section is split, this many tokens from the end of one
+    # part are repeated at the start of the next, so a sentence that
+    # depends on the previous one still makes sense on its own.
+    chunk_overlap_tokens: int = 50
+    # Judgment paragraphs shorter than this are merged with their
+    # neighbours (statute sections are never merged, to keep citations
+    # exact).
+    chunk_min_tokens: int = 40
+    # A line that appears at the top or bottom of at least this share of
+    # pages is treated as a running header/footer and removed.
+    header_footer_min_ratio: float = 0.5
 
 
 @lru_cache
