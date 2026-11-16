@@ -100,3 +100,59 @@ def make_png(path: Path, frames: int = 1) -> Path:
     else:  # multi-page TIFF
         images[0].save(path, save_all=True, append_images=images[1:])
     return path
+
+
+# ---------------------------------------------------------------------------
+# Chunking helpers
+# ---------------------------------------------------------------------------
+def pages_result(pages, file_type="pdf", reliable=True):
+    """Build an ExtractionResult straight from strings (one string per page)."""
+    from app.ingestion.extraction_types import ExtractionMethod, ExtractionResult, FileType, PageText
+
+    return ExtractionResult(
+        FileType(file_type),
+        [PageText(n if reliable else None, text, ExtractionMethod.NATIVE) for n, text in enumerate(pages, 1)],
+        page_numbers_reliable=reliable,
+    )
+
+
+LONG_SECTION_BODY = " ".join(
+    f"Sentence {i} explains a further consequence of the breach in plain terms." for i in range(1, 40)
+)
+
+
+def make_statute_pdf(path: Path) -> Path:
+    """
+    A 3-page statute-style PDF like the ones from India Code: a running
+    header on every page, "- n -" page numbers, chapters, sections,
+    sub-sections, clauses, an Explanation, and Section 73 long enough to be
+    split and running from page 2 onto page 3.
+    """
+    pages = [
+        ["CHAPTER I", "PRELIMINARY",
+         "1. Short title, extent and commencement. - (1) This Act may be called the Sample Contract Act, 1872.",
+         "(2) It extends to the whole of India.",
+         "2. Interpretation-clause. - In this Act the following words are used in the following senses: -",
+         "(a) when one person signifies to another his willingness to do anything, he is said to make a proposal;",
+         "(b) when the person to whom the proposal is made signifies his assent thereto, the proposal is said to be accepted;"],
+        ["CHAPTER VI", "OF THE CONSEQUENCES OF BREACH OF CONTRACT",
+         "73. Compensation for loss or damage caused by breach of contract. - When a contract has been broken, "
+         "the party who suffers by such breach is entitled to receive compensation. " + LONG_SECTION_BODY[:900]],
+        [LONG_SECTION_BODY[900:],
+         "Explanation. - In estimating the loss, the means which existed of remedying the inconvenience must be taken into account.",
+         "74. Compensation for breach of contract where penalty stipulated for. - When a contract has been broken, "
+         "the party complaining of the breach is entitled to reasonable compensation."],
+    ]
+    document = pymupdf.open()
+    for number, paragraphs in enumerate(pages, start=1):
+        page = document.new_page()
+        page.insert_text((60, 40), "THE SAMPLE CONTRACT ACT, 1872", fontsize=9)  # running header
+        y = 70
+        for paragraph in paragraphs:
+            rect = pymupdf.Rect(60, y, 540, 800)
+            unused = page.insert_textbox(rect, paragraph, fontsize=10.5)
+            y += (rect.height - unused) + 26
+        page.insert_text((290, 820), f"- {number} -", fontsize=9)  # page number footer
+    document.save(path)
+    document.close()
+    return path
