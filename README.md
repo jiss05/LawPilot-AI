@@ -110,6 +110,41 @@ Backend URL: http://127.0.0.1:8000/
 
 API documentation: http://127.0.0.1:8000/docs
 
+### Run the whole backend stack with Docker (recommended)
+
+From the repository root (Docker Desktop running):
+
+```bash
+cp backend/.env.example backend/.env     # then set JWT_SECRET_KEY and the email settings
+docker compose up -d --build             # postgres + qdrant + backend
+docker compose logs -f backend           # watch migrations, then uploads being processed
+```
+
+- API docs: http://localhost:8000/docs
+- Readiness: http://localhost:8000/api/v1/health/ready (database, migration, Qdrant)
+- The backend container applies migrations (`alembic upgrade head`) and seeds roles on start.
+- The first upload downloads the OCR and embedding models (a few minutes) into the `model_cache` volume.
+
+To run only the databases and start the backend yourself with `uvicorn`:
+
+```bash
+docker compose up -d postgres qdrant
+cd backend && alembic upgrade head && uvicorn app.main:app --reload
+```
+
+Create the first administrator with `python scripts/create_admin.py` (from `backend/`).
+
+### Tests
+
+```bash
+cd backend
+pytest                                   # unit tests, no database needed
+# + integration tests against the Docker Postgres (rolled back, leave no data):
+TEST_DATABASE_URL=postgresql+psycopg://legal_ai_user:local_dev_password@localhost:5432/legal_ai pytest
+# end-to-end check of a running backend (upload -> process -> search -> audit):
+python scripts/smoke_test.py --email <admin email> --password <admin password>
+```
+
 ## 6. Frontend Setup
 
 Open another terminal and navigate to the frontend directory:
@@ -152,6 +187,18 @@ Never commit actual credentials, passwords, or API keys to version control.
 
 ## 9. Project Status
 
-**Current stage:** Initial project structure and development environment foundation.
+**Current stage:** Sprint 2 complete: centralized knowledge base and retrieval.
 
-Frontend and backend project skeletons have been initialized. Further implementation of AI agents, orchestration, database integration, document ingestion, and RAG functionality will be carried out in subsequent development tasks.
+| Area | Status | Details |
+|---|---|---|
+| Authentication and roles (CLIENT, LAWYER, JUDGE, ADMIN) | Done | `backend/app/api/auth_routes.py` |
+| Legal source registry and upload (admin only) | Done | `POST /api/v1/knowledge-sources` |
+| Text extraction and OCR (PDF, DOCX, TXT, scans) | Done | [`backend/app/ingestion/README.md`](backend/app/ingestion/README.md) |
+| Cleaning and legal-structure-aware chunking | Done (SCRUM-14) | same README |
+| Embeddings and Qdrant indexing | Done (SCRUM-15) | same README |
+| Hybrid retrieval (Qdrant + PostgreSQL full-text, RRF) | Done (SCRUM-16) | [`backend/app/rag/README.md`](backend/app/rag/README.md), `POST /api/v1/research/search` |
+| Source versioning, ingestion monitoring, audit trail | Done (SCRUM-18) | `/api/v1/knowledge-sources/{id}/versions`, `/api/v1/admin/*` |
+| Docker integration, health checks, smoke test | Done (SCRUM-33) | `docker-compose.yml`, `backend/Dockerfile`, `backend/scripts/smoke_test.py` |
+| Ollama/Qwen gateway, agents, frontend screens | Next sprints | BRD phases 3-7 |
+
+Uploading a document starts a background pipeline: extraction → chunking → indexing → activation. When it finishes, the document is searchable.
