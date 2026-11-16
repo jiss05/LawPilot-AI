@@ -8,12 +8,17 @@ from app.api.dashboard_routes import router as dashboard_router
 
 from app.api.knowledge_source_routes import router as knowledge_source_router
 from app.api.research_routes import router as research_router
+from app.api.admin_ingestion_routes import router as admin_ingestion_router
+from app.core.request_id import RequestIdMiddleware
 
 app = FastAPI(
     title="LawPilot AI",
     description="Multi-Agent AI Legal Support System",
     version="1.0.0"
 )
+
+# Adds an X-Request-ID to every request/response (stored in audit_events).
+app.add_middleware(RequestIdMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,3 +45,4 @@ app.include_router(user_router)
 app.include_router(dashboard_router)
 app.include_router(knowledge_source_router)
 app.include_router(research_router)
+app.include_router(admin_ingestion_router)

@@ -4,6 +4,7 @@ Jira stories (Sprint 2):
 - *Implement document text extraction and OCR*
 - *Implement document cleaning and chunking* (SCRUM-14)
 - *Implement embeddings and Qdrant indexing* (SCRUM-15)
+- *Implement source versioning and ingestion monitoring* (SCRUM-18)
 
 BRD references: §5.2 ingestion flow, §8.2 `document_chunks`, §10.1 pipeline steps, FR-016 and FR-021.
 
@@ -13,7 +14,8 @@ BRD references: §5.2 ingestion flow, §8.2 `document_chunks`, §10.1 pipeline s
 admin uploads PDF ──► background task (starts automatically)
 POST /api/v1/         ├─ extraction: validate ► extract ► OCR if needed ► JSON
 knowledge-sources     ├─ chunking:   clean ► detect sections ► chunk ► document_chunks
-                      └─ indexing:   embed ► Qdrant (point id = chunk id) ► verify
+                      ├─ indexing:   embed ► Qdrant (point id = chunk id) ► verify
+                      └─ activation: final checks ► document "completed" ► edition "active" (old edition "superseded")
 ```
 
 ## Files
@@ -38,7 +40,8 @@ knowledge-sources     ├─ chunking:   clean ► detect sections ► chunk ►
 | `embeddings.py` | `EmbeddingProvider`: sentence-transformers (default), Ollama, or hashing (tests/offline) |
 | `vector_store.py` | `QdrantVectorStore`: collection setup, write/replace points, count, retrieve, search, health |
 | `index_pipeline.py` | `run_indexing()`: embeds chunks, writes Qdrant, verifies ids and payloads, records the job |
-| `tasks.py` | `process_uploaded_document()`: runs extraction, chunking and indexing after an upload |
+| `activation.py` | `run_activation()` (last stage), `activate_version()`, `withdraw_version()`: edition management |
+| `tasks.py` | `process_uploaded_document()`: runs extraction → chunking → indexing → activation after an upload |
 | `cli.py` | `extract <file>`, `chunk <file>`, `run <document_id>` |
 
 ## How each acceptance criterion is met
@@ -73,6 +76,30 @@ knowledge-sources     ├─ chunking:   clean ► detect sections ► chunk ►
 | Metadata is associated with the correct vectors | `index_pipeline.build_payload`; `verify_index` compares chunk id, document id and a text hash |
 | Indexing failures are identified | Codes `NO_CHUNKS_TO_INDEX`, `EMBEDDING_FAILED`, `VECTOR_STORE_UNAVAILABLE`, `VECTOR_DIMENSION_MISMATCH`, `INDEX_VERIFICATION_FAILED`, which set the document to `indexing_failed` |
 
+**Source versioning and ingestion monitoring (SCRUM-18)**
+
+| Acceptance criterion | Where |
+|---|---|
+| Source versions are maintained | `POST /api/v1/knowledge-sources/{id}/versions` (new edition), `GET .../versions` (history), `activation.activate_version` (one active edition per source) |
+| Previous versions are preserved | Superseding or withdrawing only changes `source_versions.status`; files, chunks and vectors are kept, and `supersedes_version_id` links the chain. Roll back with `POST .../versions/{vid}/activate` |
+| Ingestion status is recorded | One `ingestion_jobs` row per stage (`text_extraction`, `chunking`, `indexing`, `activation`) plus `knowledge_documents.processing_status` |
+| Processing failures are visible | `GET /api/v1/admin/ingestion-jobs?status=failed`, `GET /api/v1/admin/ingestion-jobs/summary` (failures by error code, failed documents), `GET /api/v1/admin/documents/{id}/status` |
+| Administrative operations are traceable | `audit_events` rows (`app/services/audit_service.py`), with actor, target, reason and `X-Request-ID`. Read through `GET /api/v1/admin/audit-events` |
+
+### Admin API (ADMIN role only)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/knowledge-sources/{source_id}/versions` | Upload a new edition (multipart: `file`, `version_label`, `published_at`, `visibility`) |
+| GET | `/api/v1/knowledge-sources/{source_id}/versions` | Edition history with status, documents and chunk counts |
+| POST | `/api/v1/knowledge-sources/{source_id}/versions/{version_id}/activate` | Make an edition the searchable one (roll back), with `{"reason": "..."}` |
+| POST | `/api/v1/knowledge-sources/{source_id}/versions/{version_id}/withdraw` | Remove an edition from search, with `{"reason": "..."}` |
+| GET | `/api/v1/admin/ingestion-jobs` | Job history; filters `status`, `stage`, `document_id`, `source_id` |
+| POST | `/api/v1/admin/ingestion-jobs` | Start or retry processing: `{"document_id": "..."}` |
+| GET | `/api/v1/admin/ingestion-jobs/summary` | Dashboard numbers, failed documents, Qdrant health |
+| GET | `/api/v1/admin/documents/{document_id}/status` | One document's timeline, chunk and vector counts, `searchable` |
+| GET | `/api/v1/admin/audit-events` | Audit trail; filters `action`, `target_id`, `actor_user_id` |
+
 ## What a chunk row looks like (`document_chunks`)
 
 | Column | Example | Meaning |
@@ -90,14 +117,14 @@ knowledge-sources     ├─ chunking:   clean ► detect sections ► chunk ►
 ## Status values
 
 `knowledge_documents.processing_status`:
-`pending` (upload) → `extracting` → `extracted` → `chunking` → `chunked` → `indexing` → `indexed`,
-or `empty` / `corrupted` / `extraction_failed` / `chunking_failed` / `indexing_failed`.
+`pending` (upload) → `extracting` → `extracted` → `chunking` → `chunked` → `indexing` → `indexed` → `completed`,
+or `empty` / `corrupted` / `extraction_failed` / `chunking_failed` / `indexing_failed` / `activation_failed`.
 
-`source_versions.status` stays `pending` until a later activation story sets `active`.
+`source_versions.status`: `pending` → `active` (after activation) → `superseded` (newer edition activated) or `withdrawn` (by an admin); `failed` if the new edition's processing failed.
 
-`ingestion_jobs`: one row per stage (`counts.stage` = `text_extraction` or `chunking`), `status` `running` → `completed` or `failed`, linked by `knowledge_document_id`.
+`ingestion_jobs`: one row per stage (`counts.stage` = `text_extraction`, `chunking`, `indexing` or `activation`), `status` `running` → `completed` or `failed`, linked by `knowledge_document_id`.
 
-None of these is `ready` or `completed`, so the hybrid search (`app/rag`) cannot return a document until the later indexing and activation stories mark it ready.
+Search (`app/rag`) only returns `completed` documents whose edition is `active`.
 
 ## Settings (`backend/.env`, all optional)
 
