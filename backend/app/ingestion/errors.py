@@ -45,6 +45,13 @@ class ExtractionErrorCode(str, Enum):
     NO_EXTRACTION_OUTPUT = "NO_EXTRACTION_OUTPUT"  # chunking ran before extraction
     NO_CHUNKS_PRODUCED = "NO_CHUNKS_PRODUCED"      # nothing left after cleaning
 
+    # --- embedding and indexing problems (SCRUM-15) ---
+    NO_CHUNKS_TO_INDEX = "NO_CHUNKS_TO_INDEX"          # indexing ran before chunking
+    EMBEDDING_FAILED = "EMBEDDING_FAILED"              # model missing / bad vectors
+    VECTOR_STORE_UNAVAILABLE = "VECTOR_STORE_UNAVAILABLE"  # Qdrant down / unreachable
+    VECTOR_DIMENSION_MISMATCH = "VECTOR_DIMENSION_MISMATCH"  # model changed, collection not
+    INDEX_VERIFICATION_FAILED = "INDEX_VERIFICATION_FAILED"  # Qdrant count != chunk count
+
     # --- anything we did not expect (a bug or an environment problem) ---
     UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
 

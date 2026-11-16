@@ -28,6 +28,7 @@ List values (like OCR languages) must be written as JSON in the .env file:
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The `backend/` folder, worked out from this file's own location
@@ -114,6 +115,51 @@ class IngestionSettings(BaseSettings):
     # A line that appears at the top or bottom of at least this share of
     # pages is treated as a running header/footer and removed.
     header_footer_min_ratio: float = 0.5
+
+    # ------------------------------------------------------------------ #
+    # Embeddings (SCRUM-15, see app/ingestion/embeddings.py)
+    # ------------------------------------------------------------------ #
+    # Which embedding engine turns chunk text into vectors:
+    #   "sentence-transformers"  local model via the sentence-transformers
+    #                            library (BRD §5.1 default). Downloads the
+    #                            model from Hugging Face on first use.
+    #   "ollama"                 an embedding model served by Ollama
+    #                            (e.g. nomic-embed-text).
+    #   "hashing"                tiny built-in model with no download; only
+    #                            for tests and offline demos (keyword-like).
+    embedding_provider: str = "sentence-transformers"
+    # bge-small-en-v1.5: 384 dimensions, strong English retrieval, ~130 MB.
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    # Some models (the bge family) work best when the QUESTION, not the
+    # documents, starts with an instruction like this one.
+    embedding_query_instruction: str = "Represent this sentence for searching relevant passages: "
+    embedding_batch_size: int = 32
+    # Only used by the "hashing" provider.
+    embedding_dimension: int = 384
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        validation_alias=AliasChoices("INGESTION_OLLAMA_BASE_URL", "OLLAMA_BASE_URL"),
+    )
+
+    # ------------------------------------------------------------------ #
+    # Qdrant vector database (SCRUM-15, see app/ingestion/vector_store.py)
+    # ------------------------------------------------------------------ #
+    # "http://localhost:6333" = the Qdrant container from docker-compose.
+    # ":memory:" or "path:<folder>" = embedded Qdrant inside the Python
+    # process (no server needed) - used by tests and offline demos.
+    qdrant_url: str = Field(
+        default="http://localhost:6333",
+        validation_alias=AliasChoices("INGESTION_QDRANT_URL", "QDRANT_URL"),
+    )
+    qdrant_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("INGESTION_QDRANT_API_KEY", "QDRANT_API_KEY"),
+    )
+    # BRD §8.4 suggests "legal_chunks_v1". Change the suffix when the
+    # embedding model changes, because vectors of different models must
+    # never be mixed in one collection.
+    qdrant_collection: str = "legal_chunks_v1"
+    qdrant_timeout_seconds: int = 30
 
 
 @lru_cache

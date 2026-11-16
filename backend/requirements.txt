@@ -18,6 +18,10 @@ python-docx
 pillow
 easyocr
 
+# Embeddings + vector database (SCRUM-15)
+sentence-transformers
+qdrant-client
+
 # Authentication and security
 pwdlib[argon2]
 PyJWT
