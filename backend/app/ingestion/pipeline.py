@@ -72,6 +72,9 @@ class DocumentStatus:
     CHUNKING = "chunking"            # cleaning + chunking in progress
     CHUNKED = "chunked"              # chunks saved in document_chunks
     CHUNKING_FAILED = "chunking_failed"
+    INDEXING = "indexing"            # embeddings being written to Qdrant
+    INDEXED = "indexed"              # vectors stored and verified
+    INDEXING_FAILED = "indexing_failed"
 
 
 class JobStatus:

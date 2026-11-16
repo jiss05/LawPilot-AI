@@ -5,16 +5,16 @@ The upload API (POST /api/v1/knowledge-sources) answers the admin
 straight away, then FastAPI calls `process_uploaded_document()` in the
 background:
 
-    upload saved  ->  extraction (+ OCR)  ->  cleaning + chunking
-                      run_extraction()        run_chunking()
+    upload saved  ->  extraction (+ OCR)  ->  cleaning + chunking  ->  embeddings + Qdrant
+                      run_extraction()        run_chunking()          run_indexing()
 
-Chunking only runs if extraction completed. Every outcome is recorded in
+Each stage only runs if the previous one completed. Every outcome is recorded in
 `ingestion_jobs` (one row per stage) and `knowledge_documents.processing_status`,
 so the admin can watch progress:
 
-    pending -> extracting -> extracted -> chunking -> chunked
-                   |                          |
-                   +-> empty / corrupted /    +-> chunking_failed
+    pending -> extracting -> extracted -> chunking -> chunked -> indexing -> indexed
+                   |                          |                     |
+                   +-> empty / corrupted /    +-> chunking_failed   +-> indexing_failed
                        extraction_failed
 
 WHY A NEW DATABASE SESSION?
@@ -41,10 +41,14 @@ def process_document(db: Session, document_id: UUID, initiated_by: UUID) -> list
     and by the CLI `run` command.
     """
     from app.ingestion.chunk_pipeline import run_chunking
+    from app.ingestion.index_pipeline import run_indexing
 
-    jobs = [run_extraction(db, document_id, initiated_by)]
-    if jobs[-1].status == JobStatus.COMPLETED:
-        jobs.append(run_chunking(db, document_id, initiated_by))
+    stages = [run_extraction, run_chunking, run_indexing]
+    jobs = []
+    for stage in stages:
+        jobs.append(stage(db, document_id, initiated_by))
+        if jobs[-1].status != JobStatus.COMPLETED:
+            break  # a failed stage stops the pipeline; the failure is recorded
     return jobs
 
 

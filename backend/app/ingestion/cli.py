@@ -19,7 +19,7 @@ Run from the `backend` folder (with your virtual environment active):
   python -m app.ingestion.cli chunk path\\to\\act.pdf
   python -m app.ingestion.cli chunk path\\to\\judgment.pdf --source-type judgment --show-text 200
 
-  # 3) Run the real pipeline (extraction + chunking) for a knowledge_documents
+  # 3) Run the real pipeline (extraction + chunking + indexing) for a knowledge_documents
   #    row (needs Postgres and DATABASE_URL in backend/.env). Uploads through
   #    the API do this automatically; use this to re-run a document by hand.
   python -m app.ingestion.cli run <document_uuid> --user <admin_user_uuid>
@@ -144,7 +144,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             if job.error_summary:
                 print(f"Error: {job.error_summary}")
             print(json.dumps(job.counts, indent=2, default=str))
-        return 0 if all(j.status == JobStatus.COMPLETED for j in jobs) and len(jobs) == 2 else 1
+        return 0 if all(j.status == JobStatus.COMPLETED for j in jobs) else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -172,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
                          help="print the first N characters of each chunk")
     p_chunk.set_defaults(func=cmd_chunk)
 
-    p_run = sub.add_parser("run", help="extraction + chunking for a knowledge_documents row")
+    p_run = sub.add_parser("run", help="extraction + chunking + indexing for a knowledge_documents row")
     p_run.add_argument("document_id")
     p_run.add_argument("--user", required=True, help="UUID of the initiating admin")
     p_run.set_defaults(func=cmd_run)

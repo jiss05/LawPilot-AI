@@ -1,17 +1,19 @@
-# Ingestion: extraction, OCR, cleaning and chunking
+# Ingestion: extraction, OCR, cleaning, chunking and indexing
 
 Jira stories (Sprint 2):
 - *Implement document text extraction and OCR*
-- *Implement document cleaning and chunking*
+- *Implement document cleaning and chunking* (SCRUM-14)
+- *Implement embeddings and Qdrant indexing* (SCRUM-15)
 
 BRD references: §5.2 ingestion flow, §8.2 `document_chunks`, §10.1 pipeline steps, FR-016 and FR-021.
 
 ## Where this fits
 
 ```
-admin uploads PDF ──► background task (starts automatically)                     ──► embed ► Qdrant ► activate
-POST /api/v1/         ├─ extraction: validate ► extract ► OCR if needed ► JSON       (later stories)
-knowledge-sources     └─ chunking:   clean ► detect sections ► chunk ► document_chunks
+admin uploads PDF ──► background task (starts automatically)
+POST /api/v1/         ├─ extraction: validate ► extract ► OCR if needed ► JSON
+knowledge-sources     ├─ chunking:   clean ► detect sections ► chunk ► document_chunks
+                      └─ indexing:   embed ► Qdrant (point id = chunk id) ► verify
 ```
 
 ## Files
@@ -33,7 +35,10 @@ knowledge-sources     └─ chunking:   clean ► detect sections ► chunk ►
 | `chunking/chunker.py` | Groups blocks into legal units and makes chunks with page and section references |
 | `chunking/tokens.py` | Approximate token count (characters / 4) |
 | `chunk_pipeline.py` | `run_chunking()`: writes `document_chunks`, records an `ingestion_jobs` row |
-| `tasks.py` | `process_uploaded_document()`: runs extraction then chunking after an upload |
+| `embeddings.py` | `EmbeddingProvider`: sentence-transformers (default), Ollama, or hashing (tests/offline) |
+| `vector_store.py` | `QdrantVectorStore`: collection setup, write/replace points, count, retrieve, search, health |
+| `index_pipeline.py` | `run_indexing()`: embeds chunks, writes Qdrant, verifies ids and payloads, records the job |
+| `tasks.py` | `process_uploaded_document()`: runs extraction, chunking and indexing after an upload |
 | `cli.py` | `extract <file>`, `chunk <file>`, `run <document_id>` |
 
 ## How each acceptance criterion is met
@@ -58,6 +63,16 @@ knowledge-sources     └─ chunking:   clean ► detect sections ► chunk ►
 | Each chunk keeps its source and page references | `document_chunks.knowledge_document_id`, `source_version_id`, `page_number` and `metadata.page_start` / `page_end` / `source_id` / `source_title` |
 | Chunk metadata is stored correctly | `chunk_pipeline.build_chunk_rows` (tests: `test_chunk_pipeline.py`) |
 
+**Embeddings and Qdrant indexing (SCRUM-15)**
+
+| Acceptance criterion | Where |
+|---|---|
+| Embeddings are generated successfully | `embeddings.py`; every batch checked by `validate_vectors` (count, size, NaN, zero) |
+| Vectors are stored in Qdrant | `vector_store.replace_document_points` (collection `legal_chunks_v1`, cosine distance) |
+| Chunk identifiers stay consistent across databases | Qdrant point id = `document_chunks.id`; `verify_index` checks every id after writing |
+| Metadata is associated with the correct vectors | `index_pipeline.build_payload`; `verify_index` compares chunk id, document id and a text hash |
+| Indexing failures are identified | Codes `NO_CHUNKS_TO_INDEX`, `EMBEDDING_FAILED`, `VECTOR_STORE_UNAVAILABLE`, `VECTOR_DIMENSION_MISMATCH`, `INDEX_VERIFICATION_FAILED`, which set the document to `indexing_failed` |
+
 ## What a chunk row looks like (`document_chunks`)
 
 | Column | Example | Meaning |
@@ -75,8 +90,8 @@ knowledge-sources     └─ chunking:   clean ► detect sections ► chunk ►
 ## Status values
 
 `knowledge_documents.processing_status`:
-`pending` (upload) → `extracting` → `extracted` → `chunking` → `chunked`,
-or `empty` / `corrupted` / `extraction_failed` / `chunking_failed`.
+`pending` (upload) → `extracting` → `extracted` → `chunking` → `chunked` → `indexing` → `indexed`,
+or `empty` / `corrupted` / `extraction_failed` / `chunking_failed` / `indexing_failed`.
 
 `source_versions.status` stays `pending` until a later activation story sets `active`.
 
@@ -102,6 +117,10 @@ INGESTION_CHUNK_MAX_TOKENS=400
 INGESTION_CHUNK_OVERLAP_TOKENS=50
 INGESTION_CHUNK_MIN_TOKENS=40
 INGESTION_HEADER_FOOTER_MIN_RATIO=0.5
+INGESTION_EMBEDDING_PROVIDER=sentence-transformers   # or ollama, or hashing (tests/offline)
+INGESTION_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5      # 384 dimensions; downloaded on first use
+INGESTION_QDRANT_COLLECTION=legal_chunks_v1          # new name when the embedding model changes
+QDRANT_URL=http://localhost:6333                     # or :memory: / path:<folder> for embedded Qdrant
 ```
 
 ## Tests
