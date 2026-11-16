@@ -18,10 +18,12 @@ class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
     __table_args__ = (
+        # One chunk_index per FILE (migration c4d8e2f1a7b3). It used to be
+        # per edition, which broke if an edition had more than one file.
         UniqueConstraint(
-            "source_version_id",
+            "knowledge_document_id",
             "chunk_index",
-            name="uq_document_chunks_version_index",
+            name="uq_document_chunks_document_index",
         ),
         Index(
             "idx_document_chunks_source_version",
@@ -38,6 +40,14 @@ class DocumentChunk(Base):
     source_version_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("source_versions.id"),
+        nullable=False,
+    )
+
+    # The exact file this chunk was cut from. Deleting the document row
+    # deletes its chunks too (ON DELETE CASCADE).
+    knowledge_document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("knowledge_documents.id", ondelete="CASCADE"),
         nullable=False,
     )
 

@@ -23,7 +23,8 @@ class SourceVersion(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('active', 'superseded', 'withdrawn', 'failed')",
+            # 'pending' = uploaded but not processed yet (migration c4d8e2f1a7b3)
+            "status IN ('pending', 'active', 'superseded', 'withdrawn', 'failed')",
             name="ck_source_versions_status",
         ),
         Index("idx_source_versions_status", "status"),
