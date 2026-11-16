@@ -28,6 +28,7 @@ class SourceVersion(Base):
             name="ck_source_versions_status",
         ),
         Index("idx_source_versions_status", "status"),
+        Index("idx_source_versions_source", "source_id"),  # migration d7e3a91b5c20
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import (
     DateTime,
     ForeignKey,
+    Index,
     String,
     Text,
     func,
@@ -17,6 +18,13 @@ from app.db.base import Base
 
 class KnowledgeDocument(Base):
     __tablename__ = "knowledge_documents"
+
+    # Indexes for the retriever's joins and the admin monitoring filters
+    # (migration d7e3a91b5c20).
+    __table_args__ = (
+        Index("idx_knowledge_documents_version", "source_version_id"),
+        Index("idx_knowledge_documents_status", "processing_status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

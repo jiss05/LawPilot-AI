@@ -7,6 +7,7 @@ from sqlalchemy import (
     Integer,
     Text,
     UniqueConstraint,
+    text as sql_text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -24,6 +25,13 @@ class DocumentChunk(Base):
             "knowledge_document_id",
             "chunk_index",
             name="uq_document_chunks_document_index",
+        ),
+        # Full-text search index used by keyword retrieval (migration
+        # d7e3a91b5c20). The expression must match the one in the query.
+        Index(
+            "idx_document_chunks_fts",
+            sql_text("to_tsvector('english', text)"),
+            postgresql_using="gin",
         ),
         Index(
             "idx_document_chunks_source_version",
