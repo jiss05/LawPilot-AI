@@ -1,3 +1,15 @@
+# LawPilot local stack (SCRUM-33 integration).
+#
+#   Everything (database, vector store, backend API):
+#       docker compose up -d --build
+#       -> API: http://localhost:8000/docs   health: http://localhost:8000/api/v1/health/ready
+#
+#   Only the databases (when you run the backend yourself with uvicorn):
+#       docker compose up -d postgres qdrant
+#
+#   Logs of the backend (watch uploads being processed):
+#       docker compose logs -f backend
+
 services:
   postgres:
     image: postgres:16
@@ -27,6 +39,44 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  backend:
+    build: ./backend
+    container_name: legal-ai-backend
+    restart: unless-stopped
+    # Secrets and email settings come from backend/.env (copy backend/.env.example).
+    env_file:
+      - ./backend/.env
+    # Inside Docker the other services are reached by their service names,
+    # not "localhost". These override the values in backend/.env.
+    environment:
+      DATABASE_URL: postgresql+psycopg://legal_ai_user:local_dev_password@postgres:5432/legal_ai
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      INGESTION_STORAGE_DIR: /app/legal_documents
+      INGESTION_EXTRACTED_DIR: /app/storage/extracted
+    ports:
+      - "8000:8000"
+    volumes:
+      - legal_documents:/app/legal_documents   # uploaded originals
+      - ingestion_storage:/app/storage         # extracted page text
+      - model_cache:/models                    # EasyOCR + embedding models (downloaded once)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"    # lets the container reach Ollama on your PC
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health/ready').status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
 volumes:
   postgres_data:
   qdrant_data:
+  legal_documents:
+  ingestion_storage:
+  model_cache:
