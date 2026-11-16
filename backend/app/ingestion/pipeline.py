@@ -75,6 +75,14 @@ class DocumentStatus:
     INDEXING = "indexing"            # embeddings being written to Qdrant
     INDEXED = "indexed"              # vectors stored and verified
     INDEXING_FAILED = "indexing_failed"
+    COMPLETED = "completed"          # checked and searchable (SCRUM-18 activation)
+    ACTIVATION_FAILED = "activation_failed"
+
+
+# Statuses meaning "the pipeline is working on this document right now".
+IN_PROGRESS_STATUSES = frozenset(
+    {DocumentStatus.EXTRACTING, DocumentStatus.CHUNKING, DocumentStatus.INDEXING}
+)
 
 
 class JobStatus:

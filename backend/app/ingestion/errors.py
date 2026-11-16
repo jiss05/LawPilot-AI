@@ -52,6 +52,9 @@ class ExtractionErrorCode(str, Enum):
     VECTOR_DIMENSION_MISMATCH = "VECTOR_DIMENSION_MISMATCH"  # model changed, collection not
     INDEX_VERIFICATION_FAILED = "INDEX_VERIFICATION_FAILED"  # Qdrant count != chunk count
 
+    # --- activation (SCRUM-18) ---
+    ACTIVATION_CHECK_FAILED = "ACTIVATION_CHECK_FAILED"  # final quality checks failed
+
     # --- anything we did not expect (a bug or an environment problem) ---
     UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
 
