@@ -30,6 +30,11 @@ def settings(tmp_path: Path) -> IngestionSettings:
         storage_dir=tmp_path / "documents",
         extracted_dir=tmp_path / "extracted",
         ocr_dpi=72,  # small images = fast tests
+        # Embedded Qdrant + built-in hashing embeddings: no server, no download.
+        embedding_provider="hashing",
+        embedding_dimension=64,
+        qdrant_url=":memory:",
+        qdrant_collection=f"test_{tmp_path.name}",  # fresh collection per test
     )
 
 

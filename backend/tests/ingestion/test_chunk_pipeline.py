@@ -45,6 +45,10 @@ class FakeSession:
         for obj in objs:
             self.add(obj)
 
+    def scalars(self, statement):
+        """Only used for "this document's chunks, in order"."""
+        return iter(self.chunks())
+
     def execute(self, statement):
         assert isinstance(statement, Delete)
         self.deletes.append(statement)
@@ -175,12 +179,18 @@ class FakeJob:
         self.status, self.counts = status, {"stage": stage}
 
 
-def test_process_document_runs_chunking_only_after_successful_extraction(monkeypatch):
+def test_process_document_runs_each_stage_only_after_the_previous_succeeds(monkeypatch):
     calls = []
     monkeypatch.setattr(tasks, "run_extraction", lambda db, d, u: calls.append("extract") or FakeJob("text_extraction", JobStatus.COMPLETED))
     monkeypatch.setattr("app.ingestion.chunk_pipeline.run_chunking", lambda db, d, u: calls.append("chunk") or FakeJob("chunking", JobStatus.COMPLETED))
+    monkeypatch.setattr("app.ingestion.index_pipeline.run_indexing", lambda db, d, u: calls.append("index") or FakeJob("indexing", JobStatus.COMPLETED))
     tasks.process_document(None, uuid.uuid4(), uuid.uuid4())
-    assert calls == ["extract", "chunk"]
+    assert calls == ["extract", "chunk", "index"]
+
+    calls.clear()
+    monkeypatch.setattr("app.ingestion.chunk_pipeline.run_chunking", lambda db, d, u: calls.append("chunk") or FakeJob("chunking", JobStatus.FAILED))
+    tasks.process_document(None, uuid.uuid4(), uuid.uuid4())
+    assert calls == ["extract", "chunk"]  # no indexing after a failed chunking
 
     calls.clear()
     monkeypatch.setattr(tasks, "run_extraction", lambda db, d, u: calls.append("extract") or FakeJob("text_extraction", JobStatus.FAILED))
