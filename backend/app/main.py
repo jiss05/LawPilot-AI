@@ -9,6 +9,7 @@ from app.api.dashboard_routes import router as dashboard_router
 from app.api.knowledge_source_routes import router as knowledge_source_router
 from app.api.research_routes import router as research_router
 from app.api.admin_ingestion_routes import router as admin_ingestion_router
+from app.api.health_routes import router as health_router
 from app.core.request_id import RequestIdMiddleware
 
 app = FastAPI(
@@ -46,3 +47,4 @@ app.include_router(dashboard_router)
 app.include_router(knowledge_source_router)
 app.include_router(research_router)
 app.include_router(admin_ingestion_router)
+app.include_router(health_router)
