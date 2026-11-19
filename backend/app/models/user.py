@@ -69,3 +69,16 @@ class User(Base):
         foreign_keys="UserRole.user_id",
         back_populates="user",
     )
+    
+    @property
+    def role(self):
+        if not self.role_assignments:
+            return None
+
+        # Admin always takes priority when a user has multiple roles
+        for assignment in self.role_assignments:
+            if assignment.role.code == "ADMIN":
+                return "ADMIN"
+
+        # Otherwise, return the user's regular role
+        return self.role_assignments[0].role.code
