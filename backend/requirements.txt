@@ -1,6 +1,7 @@
 
 fastapi
 uvicorn[standard]
+python-multipart          # needed by FastAPI for file uploads (Form/File)
 
 # Database
 sqlalchemy
