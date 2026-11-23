@@ -14,6 +14,7 @@ from sqlalchemy.sql.dml import Delete
 
 from app.ingestion import tasks
 from app.ingestion.chunk_pipeline import chunk_uuid, run_chunking
+from app.ingestion.chunking.chunker import CHUNKER_VERSION
 from app.ingestion.extractor import DocumentExtractor
 from app.ingestion.pipeline import DocumentStatus, JobStatus, run_extraction
 from app.models.document_chunk import DocumentChunk
@@ -136,7 +137,7 @@ def test_job_rows_link_to_the_document(world):
     jobs = db.jobs()
     assert [j.counts["stage"] for j in jobs] == ["text_extraction", "chunking"]
     assert all(j.knowledge_document_id == document.id for j in jobs)
-    assert jobs[1].counts["chunker_version"] == "1.0"
+    assert jobs[1].counts["chunker_version"] == CHUNKER_VERSION
     assert jobs[1].counts["cleaning"]["edge_lines_removed"] >= 6  # 3 headers + 3 page numbers
 
 

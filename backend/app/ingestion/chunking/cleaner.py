@@ -18,6 +18,12 @@ page references from extraction are never lost.
     one paragraph broken into many short        lines_to_paragraphs()
     lines (PDFs store visual lines, not
     paragraphs)
+    an "ARRANGEMENT OF SECTIONS" table of        find_table_of_contents_pages()
+    contents before the Act itself (India
+    Code PDFs): section titles without text
+    amendment footnotes at the bottom of a      split_footnotes()
+    page ("2. Subs. by Act 3 of 1951 ...")
+    that would otherwise look like sections
 
 What we deliberately DO NOT change: the words themselves, numbering such
 as "73." / "(1)" / "(a)", dashes like "commencement.—(1)", and case. Legal
@@ -164,7 +170,7 @@ _STRUCTURAL_START_RE = re.compile(
     r"""^(
         (CHAPTER|PART|SCHEDULE)\b                       # CHAPTER VI, PART II
       | (Section|Sec\.|S\.)\s*\d                          # Section 73
-      | \d{1,4}[A-Z]{0,3}\.\s                             # 73. / 12. (sections, paras)
+      | (\d{1,2}\s?\[)?\d{1,4}[A-Z]{0,3}\.\s*(?=[A-Z(\["'])  # 73. / 73.Compensation / 2[19A. (inserted by amendment)
       | \(\d{1,3}[A-Z]?\)\s                               # (1)
       | \([a-z]{1,4}\)\s                                  # (a) (iv)
       | (Explanation|Illustrations?|Exception|Provided)\b # explanations, provisos
@@ -229,6 +235,93 @@ def lines_to_paragraphs(lines: list[str]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# 4. Table of contents ("ARRANGEMENT OF SECTIONS")
+# ---------------------------------------------------------------------------
+# India Code PDFs start with several pages that list every section title:
+#     73. Compensation for loss or damage caused by breach of contract.
+# Chunked as-is, every section would appear twice: once as a bare title.
+# These pages run from the "ARRANGEMENT OF SECTIONS" heading up to the page
+# where the Act itself begins ("ACT NO. 9 OF 1872", "BE it enacted ...").
+_TOC_START_RE = re.compile(r"^\s*(ARRANGEMENT\s+OF\s+(SECTIONS|RULES|REGULATIONS|CLAUSES)|TABLE\s+OF\s+CONTENTS|CONTENTS)\s*$",
+                           re.IGNORECASE | re.MULTILINE)
+_BODY_START_RE = re.compile(r"(\bACT\s+NO\.?\s*\d+|\bBE\s+it\s+enacted\b|\bit\s+is\s+hereby\s+enacted\b|^\s*WHEREAS\b)",
+                            re.IGNORECASE | re.MULTILINE)
+
+
+def find_table_of_contents_pages(pages_text: list[str]) -> set[int]:
+    """
+    Return the indexes of table-of-contents pages. Only removes something
+    when BOTH the TOC heading and the start of the Act body are found;
+    otherwise nothing is touched (safe for documents without a TOC).
+    """
+    first_quarter = max(1, len(pages_text) // 4 + 1)
+    toc_start = next((i for i, t in enumerate(pages_text[:first_quarter]) if _TOC_START_RE.search(t)), None)
+    if toc_start is None:
+        return set()
+    body_start = next((i for i in range(toc_start, len(pages_text)) if _BODY_START_RE.search(pages_text[i])), None)
+    if body_start is None or body_start == toc_start:
+        return set()
+    return set(range(toc_start, body_start))
+
+
+# ---------------------------------------------------------------------------
+# 5. Amendment footnotes
+# ---------------------------------------------------------------------------
+# Official Indian Acts record their amendment history in numbered footnotes
+# at the bottom of each page:
+#     2. Subs. by Act 3 of 1951, s. 3 and Sch., for "except Part B States."
+#     3. The words "except ..." omitted by Act 34 of 2019, s. 95 (w.e.f. 31-10-2019).
+# They start with "2." just like Section 2, so they must be taken out of the
+# body text BEFORE structure detection. They are kept (not thrown away):
+# each page's footnotes are stored with the chunks of that page.
+_NUMBERED_LINE_RE = re.compile(r"^\s*(\d{1,3})\.\s*\S")
+# Words that appear in amendment / editorial footnotes of Indian Acts:
+#   "Subs. by Act 3 of 1951", "Ins. by", "rep. by", "omitted by", "w.e.f.",
+#   "See s. 138, infra.", "Cf. s. 238", "As to ...", "(9 of 1890)", "ibid."
+_FOOTNOTE_VOCAB_RE = re.compile(
+    r"(\b(Subs|Ins|Rep|subs|ins|rep)\.|[Oo]mitted|[Ii]nserted|[Ss]ubstituted|[Rr]epealed|[Rr]enumbered"
+    r"|[Aa]mended|w\.e\.f\.|by\s+(the\s+)?(Act|Ord\.|Ordinance|A\.\s?O\.|Regulation|Notification)\b"
+    r"|Gazette|[Dd]eclared\s+in\s+force|[Ee]xtended\s+to|Adaptation|\b[Vv]ide\b|\b[Ss]ee\b"
+    r"|\b(infra|supra|ibid)\b|\bC\.?f\.|\bAs\s+to\b|Statement\s+of\s+Objects"
+    r"|\b[Ss]s?\.\s?\d|\(\d+\s+of\s+\d{4}\))"
+)
+# Footnotes are numbered 1, 2, 3 ... on each page; a block starting higher
+# than this is not a footnote block (e.g. "239. [...] Rep. by s. 73" is a
+# repealed SECTION whose text happens to use footnote-like words).
+MAX_FIRST_FOOTNOTE_NUMBER = 15
+
+
+def _is_footnote_start(lines: list[str], index: int) -> bool:
+    if not _NUMBERED_LINE_RE.match(lines[index]):
+        return False
+    window = " ".join(lines[index:index + 3])  # a footnote's vocabulary may wrap to the next line
+    return bool(_FOOTNOTE_VOCAB_RE.search(window))
+
+
+def split_footnotes(lines: list[str]) -> tuple[list[str], list[str]]:
+    """
+    Split one page into (body lines, footnote lines).
+
+    The footnote block is the bottom part of the page that starts with a
+    numbered line using amendment vocabulary, and whose numbered lines run
+    1, 2, 3 ... without gaps (footnote numbering restarts on every page). Only the lower half of the page is searched,
+    so a numbered body paragraph near the top is never mistaken for one.
+    """
+    content_indexes = [i for i, line in enumerate(lines) if line.strip()]
+    if not content_indexes:
+        return lines, []
+    lower_half_start = content_indexes[len(content_indexes) // 2]
+    for i in range(lower_half_start, len(lines)):
+        if not _is_footnote_start(lines, i):
+            continue
+        numbers = [int(m.group(1)) for line in lines[i:] if (m := _NUMBERED_LINE_RE.match(line))]
+        consecutive = all(b == a + 1 for a, b in zip(numbers, numbers[1:]))
+        if numbers[0] <= MAX_FIRST_FOOTNOTE_NUMBER and consecutive:
+            return lines[:i], [line for line in lines[i:] if line.strip()]
+    return lines, []
+
+
+# ---------------------------------------------------------------------------
 # Putting it together
 # ---------------------------------------------------------------------------
 @dataclass
@@ -237,6 +330,10 @@ class CleanedPage:
     paragraphs: list[str]
     method: ExtractionMethod
     ocr_confidence: float | None = None
+    # Amendment footnotes removed from this page's body (kept as metadata).
+    footnotes: list[str] = field(default_factory=list)
+    # True for table-of-contents pages (their paragraphs are empty).
+    is_table_of_contents: bool = False
 
     @property
     def text(self) -> str:
@@ -250,6 +347,8 @@ class CleaningReport:
     header_footer_patterns: int = 0
     edge_lines_removed: int = 0
     hyphenations_fixed: int = 0
+    toc_pages_removed: int = 0
+    footnotes_separated: int = 0
     chars_before: int = 0
     chars_after: int = 0
     warnings: list[str] = field(default_factory=list)
@@ -259,9 +358,37 @@ class CleaningReport:
             "header_footer_patterns": self.header_footer_patterns,
             "edge_lines_removed": self.edge_lines_removed,
             "hyphenations_fixed": self.hyphenations_fixed,
+            "toc_pages_removed": self.toc_pages_removed,
+            "footnotes_separated": self.footnotes_separated,
             "chars_before": self.chars_before,
             "chars_after": self.chars_after,
         }
+
+
+# ---------------------------------------------------------------------------
+# Watermarks and sections glued onto the previous line
+# ---------------------------------------------------------------------------
+# India Code PDFs carry a faint "IndiaCode" watermark that the text layer
+# mixes into the middle of sentences ("As betweenIndiaCodethe principal").
+_WATERMARK_RE = re.compile(r"India\s?Code(?!\s+of\b)")
+# A new section sometimes starts on the same text line as the end of the
+# previous one, separated only by a run of spaces:
+#   "... may employ an agent.    184. Who may be an agent.—..."
+_GLUED_SECTION_RE = re.compile(r"(?<=[.;:\]—-])\s{3,}(?=(\d{1,2}\s?\[)?\d{1,4}[A-Z]{0,3}\.\s*[A-Z(\[\"'])")
+
+
+def remove_watermarks(line: str) -> str:
+    # Replaced by a space (not removed) so the spacing around it survives
+    # for split_glued_sections; extra spaces are harmless later on.
+    return _WATERMARK_RE.sub(" ", line) if "ndia" in line else line
+
+
+def split_glued_sections(lines: list[str]) -> list[str]:
+    """Put a section that starts mid-line onto its own line."""
+    out: list[str] = []
+    for line in lines:
+        out.extend(_GLUED_SECTION_RE.split(line)[::2] if _GLUED_SECTION_RE.search(line) else [line])
+    return [re.sub(r" {2,}", " ", part).strip() if part.strip() else "" for part in out if part is not None]
 
 
 def clean_pages(pages: list[PageText], header_footer_min_ratio: float = 0.5) -> tuple[list[CleanedPage], CleaningReport]:
@@ -273,14 +400,26 @@ def clean_pages(pages: list[PageText], header_footer_min_ratio: float = 0.5) -> 
     repeated = find_repeated_edge_lines(pages_lines, header_footer_min_ratio)
     report.header_footer_patterns = len(repeated)
 
+    toc_pages = find_table_of_contents_pages(["\n".join(lines) for lines in pages_lines])
+    report.toc_pages_removed = len(toc_pages)
+
     cleaned: list[CleanedPage] = []
-    for page, lines in zip(pages, pages_lines):
+    for index, (page, lines) in enumerate(zip(pages, pages_lines)):
+        if index in toc_pages:
+            cleaned.append(CleanedPage(page.page_number, [], page.method, page.ocr_confidence,
+                                       is_table_of_contents=True))
+            continue
         lines, removed = _strip_edges(lines, repeated)
         report.edge_lines_removed += removed
+        lines = split_glued_sections([remove_watermarks(line) for line in lines])
+        lines, footnote_lines = split_footnotes(lines)
+        footnotes = lines_to_paragraphs(footnote_lines) if footnote_lines else []
+        report.footnotes_separated += len(footnotes)
         text, fixed = dehyphenate("\n".join(lines))
         report.hyphenations_fixed += fixed
         paragraphs = lines_to_paragraphs(text.split("\n"))
-        cleaned.append(CleanedPage(page.page_number, paragraphs, page.method, page.ocr_confidence))
+        cleaned.append(CleanedPage(page.page_number, paragraphs, page.method, page.ocr_confidence,
+                                   footnotes=footnotes))
 
     report.chars_after = sum(len(p.text) for p in cleaned)
     return cleaned, report

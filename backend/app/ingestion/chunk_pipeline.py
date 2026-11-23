@@ -95,6 +95,7 @@ def build_chunk_rows(
     source: KnowledgeSource | None,
     result: ExtractionResult,
     chunks: list[Chunk],
+    footnotes_for=lambda chunk: [],
 ) -> list[DocumentChunk]:
     """Turn Chunk objects into DocumentChunk database rows."""
     rows = []
@@ -118,6 +119,9 @@ def build_chunk_rows(
             "char_count": chunk.char_count,
             # --- how it was produced (for debugging and re-processing) ---
             **_page_info(result, chunk),
+            # Amendment footnotes printed on this chunk's pages (official
+            # amendment history: "Subs. by Act 3 of 1951 ...").
+            "footnotes": footnotes_for(chunk)[:20],
             "chunker_version": CHUNKER_VERSION,
         }
         rows.append(
@@ -192,7 +196,7 @@ def run_chunking(
         # One transaction: old chunks out, new chunks in. If anything fails
         # before commit, the database keeps the previous chunks untouched.
         db.execute(delete(DocumentChunk).where(DocumentChunk.knowledge_document_id == document.id))
-        db.add_all(build_chunk_rows(document, source, result, chunking.chunks))
+        db.add_all(build_chunk_rows(document, source, result, chunking.chunks, chunking.footnotes_for))
 
         document.processing_status = DocumentStatus.CHUNKED
         job.status = JobStatus.COMPLETED

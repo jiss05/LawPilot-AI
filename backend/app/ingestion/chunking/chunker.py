@@ -48,7 +48,13 @@ from app.ingestion.chunking.tokens import METHOD as TOKEN_METHOD
 from app.ingestion.chunking.tokens import estimate_tokens
 from app.ingestion.extraction_types import ExtractionResult
 
-CHUNKER_VERSION = "1.0"  # stored with each chunk; bump when the rules change
+# Stored with each chunk; bump when the rules change.
+# 1.1: table of contents removed, amendment footnotes separated, stricter
+#      section headings, tiny fragments dropped (tested on India Code PDFs).
+CHUNKER_VERSION = "1.1"
+# Chunks with fewer letters than this are leftovers such as a watermark
+# ("IndiaCode") or a lone "[Repealed.]" marker, and are dropped.
+MIN_CHUNK_LETTERS = 20
 
 
 @dataclass
@@ -76,6 +82,18 @@ class ChunkingResult:
     mode: Mode
     cleaning: CleaningReport
     warnings: list[str] = field(default_factory=list)
+    # page number -> amendment footnotes found on that page
+    footnotes_by_page: dict[int, list[str]] = field(default_factory=dict)
+    fragments_dropped: int = 0
+
+    def footnotes_for(self, chunk: "Chunk") -> list[str]:
+        if chunk.page_start is None:
+            return []
+        return [
+            note
+            for page in range(chunk.page_start, (chunk.page_end or chunk.page_start) + 1)
+            for note in self.footnotes_by_page.get(page, [])
+        ]
 
     def summary(self) -> dict:
         tokens = [c.token_count for c in self.chunks] or [0]
@@ -88,6 +106,7 @@ class ChunkingResult:
             "tokens_avg": round(sum(tokens) / len(tokens), 1),
             "token_estimate": TOKEN_METHOD,
             "chunker_version": CHUNKER_VERSION,
+            "fragments_dropped": self.fragments_dropped,
             "cleaning": self.cleaning.to_dict(),
             "warnings": sorted(set(self.warnings)),
         }
@@ -316,9 +335,11 @@ def chunk_document(
             else:
                 chunks.append(new_chunk)
 
-    for index, chunk in enumerate(chunks):
+    kept = [c for c in chunks if sum(ch.isalpha() for ch in c.text) >= MIN_CHUNK_LETTERS]
+    for index, chunk in enumerate(kept):
         chunk.chunk_index = index
-    return ChunkingResult(chunks, mode, report, warnings)
+    footnotes = {p.page_number: p.footnotes for p in cleaned if p.page_number is not None and p.footnotes}
+    return ChunkingResult(kept, mode, report, warnings, footnotes, fragments_dropped=len(chunks) - len(kept))
 
 
 def _should_merge(chunks: list[Chunk], new: Chunk, mode: Mode, min_tokens: int, max_tokens: int) -> bool:
