@@ -1,0 +1,126 @@
+
+.role-profile-page {
+  max-width: 1000px;
+}
+
+.role-profile-heading {
+  margin-bottom: 24px;
+}
+
+.role-profile-heading h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  color: #1e293b;
+}
+
+.role-profile-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.role-profile-card {
+  background: #ffffff;
+  border: 1px solid #e5eaf0;
+  border-radius: 12px;
+  padding: 28px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.role-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.role-profile-avatar {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #e2eaf5;
+  color: #23476f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.role-profile-header h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: #1e293b;
+}
+
+.role-profile-header p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.role-profile-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: #eaf1fb;
+  color: #315b8e;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.role-profile-divider {
+  height: 1px;
+  background: #e5eaf0;
+  margin: 26px 0;
+}
+
+.role-profile-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px;
+}
+
+.role-profile-detail {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #315b8e;
+}
+
+.role-profile-detail div {
+  min-width: 0;
+}
+
+.role-profile-detail span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.role-profile-detail p {
+  margin: 0;
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.role-profile-error {
+  padding: 16px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+@media (max-width: 600px) {
+  .role-profile-card {
+    padding: 20px;
+  }
+
+  .role-profile-details {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+}

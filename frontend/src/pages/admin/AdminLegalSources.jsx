@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 import {
   BookOpen,
@@ -13,6 +14,7 @@ import './AdminLegalSources.css'
 
 function AdminLegalSources() {
   const [sources, setSources] = useState([])
+  const [documentsBySource, setDocumentsBySource] = useState({})
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -25,6 +27,7 @@ function AdminLegalSources() {
     source_type: '',
     jurisdiction: '',
     trust_tier: '',
+    visibility: 'public',
     publisher: '',
     canonical_url: '',
     version_label: '',
@@ -38,7 +41,27 @@ function AdminLegalSources() {
 
     try {
       const response = await api.get('/knowledge-sources')
-      setSources(response.data)
+      const loadedSources = response.data
+
+      setSources(loadedSources)
+
+      const documentResults = await Promise.all(
+        loadedSources.map(async (source) => {
+          try {
+            const documentResponse = await api.get(
+              `/knowledge-sources/${source.id}/documents`
+            )
+
+            return [source.id, documentResponse.data]
+          } catch {
+            return [source.id, []]
+          }
+        })
+      )
+
+      setDocumentsBySource(
+        Object.fromEntries(documentResults)
+      )
     } catch (err) {
       setError(
         err.response?.data?.detail ||
@@ -66,7 +89,10 @@ function AdminLegalSources() {
     const selectedFile = e.target.files?.[0]
 
     if (!selectedFile) {
-      setForm((previous) => ({ ...previous, file: null }))
+      setForm((previous) => ({
+        ...previous,
+        file: null,
+      }))
       return
     }
 
@@ -96,6 +122,7 @@ function AdminLegalSources() {
       source_type: '',
       jurisdiction: '',
       trust_tier: '',
+      visibility: 'public',
       publisher: '',
       canonical_url: '',
       version_label: '',
@@ -124,6 +151,7 @@ function AdminLegalSources() {
     formData.append('source_type', form.source_type.trim())
     formData.append('jurisdiction', form.jurisdiction.trim())
     formData.append('trust_tier', form.trust_tier.trim())
+    formData.append('visibility', form.visibility)
     formData.append('file', form.file)
 
     if (form.publisher.trim()) {
@@ -164,15 +192,33 @@ function AdminLegalSources() {
     }
   }
 
+  const getVisibilityLabel = (visibility) => {
+    const labels = {
+      public: 'Public',
+      internal: 'Internal',
+      private: 'Private',
+    }
+
+    return labels[visibility?.toLowerCase()] || 'Not specified'
+  }
+
   const filteredSources = sources.filter((source) => {
     const searchTerm = search.toLowerCase()
 
-    return (
+    const sourceMatches =
       source.title?.toLowerCase().includes(searchTerm) ||
       source.publisher?.toLowerCase().includes(searchTerm) ||
       source.jurisdiction?.toLowerCase().includes(searchTerm) ||
       source.source_type?.toLowerCase().includes(searchTerm)
+
+    const documents = documentsBySource[source.id] || []
+
+    const documentMatches = documents.some((document) =>
+      document.filename?.toLowerCase().includes(searchTerm) ||
+      document.visibility?.toLowerCase().includes(searchTerm)
     )
+
+    return sourceMatches || documentMatches
   })
 
   return (
@@ -210,7 +256,7 @@ function AdminLegalSources() {
 
           <input
             type="text"
-            placeholder="Search legal sources..."
+            placeholder="Search legal sources or documents..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -308,6 +354,36 @@ function AdminLegalSources() {
                   placeholder="e.g. Official, Primary"
                   required
                 />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="source-visibility">
+                  Document Access Level *
+                </label>
+
+                <select
+                  id="source-visibility"
+                  name="visibility"
+                  value={form.visibility}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="public">
+                    Public — All authenticated users
+                  </option>
+
+                  <option value="internal">
+                    Internal — Lawyers and Judges
+                  </option>
+
+                  <option value="private">
+                    Private — Admin and uploader
+                  </option>
+                </select>
+
+                <small>
+                  Choose which user roles can retrieve this document.
+                </small>
               </div>
 
               <div className="form-field">
@@ -415,6 +491,7 @@ function AdminLegalSources() {
               <th>Source Type</th>
               <th>Jurisdiction</th>
               <th>Trust Tier</th>
+              <th>Documents & Access Level</th>
               <th>Publisher</th>
               <th>Registered</th>
             </tr>
@@ -423,56 +500,87 @@ function AdminLegalSources() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" className="legal-sources-message">
+                <td colSpan="7" className="legal-sources-message">
                   Loading legal sources...
                 </td>
               </tr>
             ) : filteredSources.length === 0 ? (
               <tr>
-                <td colSpan="6" className="legal-sources-message">
+                <td colSpan="7" className="legal-sources-message">
                   {search
                     ? 'No matching legal sources found.'
                     : 'No legal sources have been registered yet.'}
                 </td>
               </tr>
             ) : (
-              filteredSources.map((source) => (
-                <tr key={source.id}>
-                  <td>
-                    <div className="legal-source-title">
-                      {source.title}
-                    </div>
+              filteredSources.map((source) => {
+                const documents = documentsBySource[source.id] || []
 
-                    {source.canonical_url && (
-                      <a
-                        href={source.canonical_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="legal-source-link"
-                      >
-                        View official source
-                      </a>
-                    )}
-                  </td>
+                return (
+                  <tr key={source.id}>
+                    <td>
+                      <div className="legal-source-title">
+                        {source.title}
+                      </div>
 
-                  <td>{source.source_type}</td>
-                  <td>{source.jurisdiction}</td>
+                      {source.canonical_url && (
+                        <a
+                          href={source.canonical_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="legal-source-link"
+                        >
+                          View official source
+                        </a>
+                      )}
+                    </td>
 
-                  <td>
-                    <span className="trust-tier-badge">
-                      {source.trust_tier}
-                    </span>
-                  </td>
+                    <td>{source.source_type}</td>
+                    <td>{source.jurisdiction}</td>
 
-                  <td>{source.publisher || '—'}</td>
+                    <td>
+                      <span className="trust-tier-badge">
+                        {source.trust_tier}
+                      </span>
+                    </td>
 
-                  <td>
-                    {source.created_at
-                      ? new Date(source.created_at).toLocaleDateString()
-                      : '—'}
-                  </td>
-                </tr>
-              ))
+                    <td>
+                      <div className="source-documents-list">
+                        {documents.length === 0 ? (
+                          <span className="document-empty">
+                            No documents found
+                          </span>
+                        ) : (
+                          documents.map((document) => (
+                            <div
+                              className="source-document-item"
+                              key={document.id}
+                            >
+                              <span className="document-filename">
+                                {document.filename}
+                              </span>
+
+                              <span
+                                className={`visibility-badge visibility-${document.visibility || 'unknown'}`}
+                              >
+                                {getVisibilityLabel(document.visibility)}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </td>
+
+                    <td>{source.publisher || '—'}</td>
+
+                    <td>
+                      {source.created_at
+                        ? new Date(source.created_at).toLocaleDateString()
+                        : '—'}
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
