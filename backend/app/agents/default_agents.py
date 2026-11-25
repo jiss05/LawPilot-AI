@@ -34,13 +34,27 @@ MAX_HISTORY_MESSAGES = 6
 MAX_SOURCE_CHARS = 1200
 
 _GROUNDING = (
-    "Use the numbered SOURCES when they are relevant and cite them as [1], [2]. "
-    "If the sources do not cover the question, say so and answer from general "
-    "knowledge of Indian law, clearly marked as general information. "
-    "Never invent case names, citations or section numbers."
+    "STRICT LEGAL EVIDENCE RULES:\n"
+    "Use only the numbered SOURCES supplied in this request as evidence "
+    "for legal claims, statutory provisions, case law and legal procedures.\n"
+    "Cite every material legal claim using the supplied source numbers, "
+    "for example [1] or [2].\n"
+    "Never invent case names, citations, judgments, statutory sections, "
+    "quotes or legal rules.\n"
+    "If the supplied sources do not establish an answer, explicitly say "
+    "that the available legal sources are insufficient.\n"
+    "Distinguish established information from unanswered questions and "
+    "identify what additional evidence is needed.\n"
+    "Do not use general model knowledge to fill gaps in legal evidence."
 )
 
-
+NO_LEGAL_EVIDENCE_MESSAGE = (
+    "I could not find supporting legal authorities in the available "
+    "knowledge base for this question. I cannot provide a reliable, "
+    "source-backed legal answer without relevant evidence. Please try "
+    "rephrasing the question or ask the administrator to add the relevant "
+    "legal materials to the knowledge base."
+)
 def format_sources(sources: list[dict[str, Any]]) -> str:
     if not sources:
         return "SOURCES: none found in the knowledge base."
@@ -97,19 +111,41 @@ class PromptAgent:
         return None, None
 
     def run(self, ctx: AgentContext, gateway: ModelGateway) -> AgentResult:
+        # Client and Lawyer Agents must have retrieved legal evidence.
+        # Do not call the LLM when retrieval returned no sources.
+        if self.name in (CLIENT_AGENT, LAWYER_AGENT) and not ctx.sources:
+            handoff_to, reason = self.handoff(ctx)
+
+            return AgentResult(
+                content=NO_LEGAL_EVIDENCE_MESSAGE,
+                citations=[],
+                handoff_to=handoff_to,
+                handoff_reason=reason,
+                metadata={
+                    "evidence": "none",
+                    "safe_fallback": True,
+                },
+            )
+
         result = gateway.generate(GenerationRequest(
             messages=self.build_messages(ctx),
             prompt_version=self.prompt_version,
             purpose=f"{self.name}_agent",
         ))
+
         handoff_to, reason = self.handoff(ctx)
+
         return AgentResult(
             content=result.text,
             citations=citations_for(ctx.sources),
             handoff_to=handoff_to,
             handoff_reason=reason,
             model_run_id=result.run_id,
-            metadata={"model": result.model, "duration_ms": result.duration_ms},
+            metadata={
+                "model": result.model,
+                "duration_ms": result.duration_ms,
+                "evidence": "retrieved",
+            },
         )
 
 
