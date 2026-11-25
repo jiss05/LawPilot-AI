@@ -187,7 +187,7 @@ Never commit actual credentials, passwords, or API keys to version control.
 
 ## 9. Project Status
 
-**Current stage:** Sprint 2 complete: centralized knowledge base and retrieval.
+**Current stage:** Sprint 3 in progress: LLM and agent integration.
 
 | Area | Status | Details |
 |---|---|---|
@@ -199,6 +199,10 @@ Never commit actual credentials, passwords, or API keys to version control.
 | Hybrid retrieval (Qdrant + PostgreSQL full-text, RRF) | Done (SCRUM-16) | [`backend/app/rag/README.md`](backend/app/rag/README.md), `POST /api/v1/research/search` |
 | Source versioning, ingestion monitoring, audit trail | Done (SCRUM-18) | `/api/v1/knowledge-sources/{id}/versions`, `/api/v1/admin/*` |
 | Docker integration, health checks, smoke test | Done (SCRUM-33) | `docker-compose.yml`, `backend/Dockerfile`, `backend/scripts/smoke_test.py` |
-| Ollama/Qwen gateway, agents, frontend screens | Next sprints | BRD phases 3-7 |
+| Ollama + Qwen integration and model evaluation | Done (SCRUM-19) | [`backend/app/llm/README.md`](backend/app/llm/README.md), `GET /api/v1/health/llm`, `backend/scripts/evaluate_model.py` |
+| Model Gateway (timeouts, retries, fallback, `model_runs` logging) | Done (SCRUM-20) | `backend/app/llm/gateway.py` |
+| LangGraph orchestrator (classification, routing, role permissions, handoffs) | Done (SCRUM-21) | [`backend/app/orchestration/README.md`](backend/app/orchestration/README.md), `POST /api/v1/assistant/chat` |
+| Client, Lawyer, Judge Support agents | Baseline agents in place; full agents in SCRUM-22/23/25 | `backend/app/agents/` |
+| Frontend screens for the assistant | Next | SCRUM-28 |
 
 Uploading a document starts a background pipeline: extraction → chunking → indexing → activation. When it finishes, the document is searchable.

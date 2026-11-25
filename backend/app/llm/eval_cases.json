@@ -1,0 +1,182 @@
+[
+  {
+    "id": "cheque_bounce",
+    "system": "You are a legal information assistant for people in India. Answer in plain language.",
+    "prompt": "My cheque bounced because of insufficient funds and I got a legal notice. What happens now?",
+    "expect": [
+      [
+        "section 138",
+        "s. 138",
+        "sec 138"
+      ],
+      [
+        "negotiable instruments"
+      ],
+      [
+        "15 days",
+        "fifteen days"
+      ],
+      [
+        "notice"
+      ]
+    ]
+  },
+  {
+    "id": "tenant_eviction",
+    "system": "You are a legal information assistant for people in India. Answer in plain language.",
+    "prompt": "Can my landlord throw me out of my rented house without any notice?",
+    "expect": [
+      [
+        "notice"
+      ],
+      [
+        "rent control",
+        "rent act",
+        "tenancy"
+      ],
+      [
+        "court",
+        "tribunal",
+        "rent controller"
+      ]
+    ]
+  },
+  {
+    "id": "fir_refusal",
+    "system": "You are a legal information assistant for people in India. Answer in plain language.",
+    "prompt": "The police refused to register my FIR. What can I do?",
+    "expect": [
+      [
+        "superintendent",
+        "sp ",
+        "senior officer"
+      ],
+      [
+        "magistrate"
+      ],
+      [
+        "section 173",
+        "section 154",
+        "173(4)",
+        "154(3)",
+        "156(3)",
+        "175(3)"
+      ]
+    ]
+  },
+  {
+    "id": "consumer_complaint",
+    "system": "You are a legal information assistant for people in India. Answer in plain language.",
+    "prompt": "An online seller sent a defective phone and refuses a refund. Where can I complain?",
+    "expect": [
+      [
+        "consumer protection act",
+        "consumer commission",
+        "consumer forum"
+      ],
+      [
+        "district"
+      ],
+      [
+        "e-daakhil",
+        "edaakhil",
+        "online"
+      ]
+    ]
+  },
+  {
+    "id": "breach_damages",
+    "system": "You are a legal research assistant for Indian advocates. Be precise and cite statutes and sections.",
+    "prompt": "Which provision of the Indian Contract Act governs compensation for breach of contract, and what is the remoteness test?",
+    "expect": [
+      [
+        "section 73"
+      ],
+      [
+        "hadley",
+        "naturally arose",
+        "natural course"
+      ],
+      [
+        "remote",
+        "indirect"
+      ]
+    ]
+  },
+  {
+    "id": "anticipatory_bail",
+    "system": "You are a legal research assistant for Indian advocates. Be precise and cite statutes and sections.",
+    "prompt": "Explain the law on anticipatory bail under the new criminal procedure code.",
+    "expect": [
+      [
+        "section 482",
+        "section 438"
+      ],
+      [
+        "bnss",
+        "bharatiya nagarik suraksha sanhita",
+        "crpc"
+      ],
+      [
+        "sessions court",
+        "high court"
+      ]
+    ]
+  },
+  {
+    "id": "article_21",
+    "system": "You are a legal research assistant for Indian advocates. Be precise and cite statutes and sections.",
+    "prompt": "What has the Supreme Court held about the scope of Article 21?",
+    "expect": [
+      [
+        "maneka gandhi"
+      ],
+      [
+        "personal liberty"
+      ],
+      [
+        "procedure established by law",
+        "just, fair and reasonable",
+        "fair, just and reasonable"
+      ]
+    ]
+  },
+  {
+    "id": "bench_note_neutral",
+    "system": "You are a neutral assistant for judges in India. Do not recommend an outcome.",
+    "prompt": "Prepare a list of issues for determination in a suit for specific performance of an agreement to sell land.",
+    "expect": [
+      [
+        "readiness and willingness",
+        "ready and willing"
+      ],
+      [
+        "specific relief act"
+      ],
+      [
+        "agreement"
+      ]
+    ]
+  },
+  {
+    "id": "classify_drafting",
+    "kind": "json",
+    "system": "Classify the message for an Indian legal assistant. Reply with JSON only: {\"intent\": one of legal_information, legal_research, document_drafting, case_analysis, out_of_scope}.",
+    "prompt": "Please draft a legal notice for recovery of Rs 2 lakh.",
+    "expected_intent": "document_drafting"
+  },
+  {
+    "id": "classify_out_of_scope",
+    "kind": "json",
+    "system": "Classify the message for an Indian legal assistant. Reply with JSON only: {\"intent\": one of legal_information, legal_research, document_drafting, case_analysis, out_of_scope}.",
+    "prompt": "Give me a recipe for chicken biryani.",
+    "expected_intent": "out_of_scope"
+  },
+  {
+    "id": "classify_information",
+    "kind": "json",
+    "system": "Classify the message for an Indian legal assistant. Reply with JSON only: {\"intent\": one of legal_information, legal_research, document_drafting, case_analysis, out_of_scope}.",
+    "prompt": "Is it legal for my employer to hold back my salary?",
+    "expected_intent": "legal_information"
+  }
+]

@@ -31,3 +31,6 @@ email-validator
 # Testing
 pytest
 httpx
+
+# LLM orchestration (Sprint 3: SCRUM-19/20/21)
+langgraph

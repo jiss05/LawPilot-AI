@@ -5,6 +5,9 @@ Health checks (SCRUM-33 integration; BRD §9 "GET /api/v1/health/ready").
     GET /api/v1/health/ready  every dependency the app needs is reachable:
                               PostgreSQL (and the latest migration applied),
                               Qdrant, embedding configuration. 503 if not.
+    GET /api/v1/health/llm    Ollama is reachable and the configured Qwen
+                              model is pulled (SCRUM-19). Kept separate from
+                              /ready so the API stays up while Ollama starts.
 
 Docker uses /ready for the backend container's healthcheck. The response
 never contains passwords or connection strings (BRD §9: "avoid exposing
@@ -53,3 +56,14 @@ def ready(db: Session = Depends(get_db)):
         status_code=200 if healthy else 503,
         content={"status": "ready" if healthy else "not_ready", "checks": checks},
     )
+
+
+@router.get("/llm")
+def llm():
+    from app.llm.gateway import get_model_gateway
+
+    try:
+        info = get_model_gateway().health()
+    except Exception as exc:  # e.g. invalid LLM_PROVIDER
+        info = {"status": "unavailable", "error": type(exc).__name__}
+    return JSONResponse(status_code=200 if info.get("status") == "ok" else 503, content=info)
