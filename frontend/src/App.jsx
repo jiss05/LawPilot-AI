@@ -1,3 +1,4 @@
+
 import {
   BrowserRouter,
   Routes,
@@ -9,22 +10,27 @@ import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 import VerifyEmailPage from './pages/VerifyEmailPage.jsx'
 
+// Admin components
 import AdminLayout from './components/AdminLayout.jsx'
 import AdminOverview from './pages/admin/AdminOverview.jsx'
 import AdminUsers from './pages/admin/AdminUsers.jsx'
 import AdminLegalSources from './pages/admin/AdminLegalSources.jsx'
 import AdminProfile from './pages/admin/AdminProfile.jsx'
 
-import './App.css'
+// Shared role components
+import RoleLayout from './components/RoleLayout.jsx'
+import RoleProfile from './components/RoleProfile.jsx'
 
-function PlaceholderPage({ title }) {
-  return (
-    <div>
-      <h1>{title}</h1>
-      <p>This section is under development.</p>
-    </div>
-  )
-}
+// Client pages
+import ClientDashboard from './pages/client/ClientDashboard.jsx'
+
+// Lawyer pages
+import LawyerDashboard from './pages/lawyer/LawyerDashboard.jsx'
+
+// Judge pages
+import JudgeDashboard from './pages/judge/JudgeDashboard.jsx'
+
+import './App.css'
 
 function App() {
   return (
@@ -39,43 +45,37 @@ function App() {
         {/* Admin dashboard */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminOverview />} />
-
-          <Route
-            path="users"
-            element={<AdminUsers />}
-          />
-
-          <Route
-            path="legal-sources"
-            element={<AdminLegalSources />}
-          />
-
-          <Route
-            path="profile"
-            element={<AdminProfile />}
-          />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="legal-sources" element={<AdminLegalSources />} />
+          <Route path="profile" element={<AdminProfile />} />
         </Route>
 
         {/* Client dashboard */}
         <Route
           path="/client"
-          element={<PlaceholderPage title="Client Dashboard" />}
-        />
+          element={<RoleLayout role="client" />}
+        >
+          <Route index element={<ClientDashboard />} />
+          <Route path="profile" element={<RoleProfile />} />
+        </Route>
 
         {/* Lawyer dashboard */}
         <Route
           path="/lawyer"
-          element={<PlaceholderPage title="Lawyer Dashboard" />}
-
-        />
+          element={<RoleLayout role="lawyer" />}
+        >
+          <Route index element={<LawyerDashboard />} />
+          <Route path="profile" element={<RoleProfile />} />
+        </Route>
 
         {/* Judge dashboard */}
         <Route
           path="/judge"
-          element={<PlaceholderPage title="Judge Dashboard" />}
-        />
-
-
+          element={<RoleLayout role="judge" />}
+        >
+          <Route index element={<JudgeDashboard />} />
+          <Route path="profile" element={<RoleProfile />} />
+        </Route>
 
         {/* Unknown URLs */}
         <Route path="*" element={<Navigate to="/login" replace />} />
