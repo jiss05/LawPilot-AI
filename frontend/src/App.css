@@ -217,6 +217,25 @@
   box-shadow: 0 0 0 3px rgba(179, 139, 81, 0.14);
 }
 
+
+.forgot-password-link {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -10px;
+  font-size: 13px;
+}
+
+.forgot-password-link a {
+  color: #9b7138;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.forgot-password-link a:hover {
+  text-decoration: underline;
+}
+
+
 .resend-code {
   display: flex;
   flex-wrap: wrap;

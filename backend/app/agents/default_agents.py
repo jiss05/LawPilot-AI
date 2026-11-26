@@ -33,6 +33,7 @@ from app.orchestration.state import (
 MAX_HISTORY_MESSAGES = 6
 MAX_SOURCE_CHARS = 1200
 
+
 _GROUNDING = (
     "STRICT LEGAL EVIDENCE RULES:\n"
     "Use only the numbered SOURCES supplied in this request as evidence "
@@ -44,9 +45,24 @@ _GROUNDING = (
     "If the supplied sources do not establish an answer, explicitly say "
     "that the available legal sources are insufficient.\n"
     "Distinguish established information from unanswered questions and "
-    "identify what additional evidence is needed.\n"
-    "Do not use general model knowledge to fill gaps in legal evidence."
+    "identify what additional evidence is needed when relevant.\n"
+    "Do not use general model knowledge to fill gaps in legal evidence.\n\n"
+
+    "RESPONSE QUALITY AND LENGTH:\n"
+    "Answer the exact question asked before providing additional context.\n"
+    "For straightforward factual legal questions, use 2-4 concise sentences "
+    "or a few short bullet points.\n"
+    "For explanations and analysis, provide only the detail needed to answer "
+    "the question accurately, including important exceptions or limitations.\n"
+    "Use longer structured responses only when the user requests research, "
+    "detailed analysis, comparison or a legal document.\n"
+    "Avoid repeating the same conclusion, unnecessary introductions, "
+    "generic disclaimers and repetitive summaries.\n"
+    "Do not reproduce a separate bibliography or source list; cite supplied "
+    "sources inline using their numbered references.\n"
+    "Never sacrifice legal accuracy or necessary qualifications for brevity."
 )
+
 
 NO_LEGAL_EVIDENCE_MESSAGE = (
     "I could not find supporting legal authorities in the available "
@@ -87,6 +103,19 @@ class PromptAgent:
     description = ""
     system_prompt = ""
     prompt_version = "base.v1"
+    def max_output_tokens_for(self, ctx: AgentContext) -> int:
+        """Set response limits by agent and task without restricting drafts."""
+        if self.name == CLIENT_AGENT:
+            if ctx.intent == INTENT_LEGAL_INFORMATION:
+                return 400
+            return 700
+
+        if self.name == LAWYER_AGENT:
+            if ctx.intent == INTENT_DOCUMENT_DRAFTING:
+                return 3000
+            return 1800
+
+        return 1800
 
     def build_messages(self, ctx: AgentContext) -> list[ChatMessage]:
         system = f"{self.system_prompt}\n\n{_GROUNDING}"
@@ -131,6 +160,7 @@ class PromptAgent:
             messages=self.build_messages(ctx),
             prompt_version=self.prompt_version,
             purpose=f"{self.name}_agent",
+            max_output_tokens=self.max_output_tokens_for(ctx),
         ))
 
         handoff_to, reason = self.handoff(ctx)
@@ -152,13 +182,23 @@ class PromptAgent:
 class ClientAgent(PromptAgent):
     name = CLIENT_AGENT
     description = "Explains legal topics in plain language for members of the public."
-    prompt_version = "client_agent.baseline.v1"
+
+    prompt_version = "client_agent.concise.v2"
     system_prompt = (
-        "You are LawPilot's assistant for members of the public in India. Explain the law "
-        "in simple, everyday language, outline practical options and next steps, and suggest "
-        "consulting a qualified advocate for decisions about a specific case. Do not give "
-        "a definitive legal opinion."
+        "You are LawPilot's legal information assistant for members of the "
+        "public in India. Explain legal topics in simple, everyday language.\n"
+        "For a straightforward question, give the direct answer first in "
+        "2-4 sentences. Mention the relevant legal provision and cite the "
+        "supplied source. Include an exception only when it materially affects "
+        "the answer.\n"
+        "Do not add generic advice, lengthy background, repeated conclusions "
+        "or an advocate disclaimer to ordinary factual questions.\n"
+        "Suggest practical next steps or consulting a qualified advocate "
+        "when the user describes a specific dispute, needs case-specific "
+        "guidance or faces an important legal decision.\n"
+        "Do not present general information as a definitive legal opinion."
     )
+
 
     def handoff(self, ctx):
         # Drafting court documents is the lawyer agent's job. The orchestrator
@@ -171,8 +211,8 @@ class ClientAgent(PromptAgent):
 class LawyerAgent(PromptAgent):
     name = LAWYER_AGENT
     description = "Legal research and drafting support for advocates."
-    prompt_version = "lawyer_agent.baseline.v1"
-    
+    prompt_version = "lawyer_agent.baseline.v2"
+
     system_prompt = (
         "You are LawPilot's legal research and drafting assistant for practising "
         "advocates in India. Support lawyers with precise, structured and "
@@ -208,15 +248,19 @@ class LawyerAgent(PromptAgent):
         "6. Treat generated drafts as drafts requiring review by a qualified "
         "lawyer, not as approved or filing-ready documents.\n\n"
 
+
         "RESPONSE FORMAT:\n"
-        "For research requests, use these sections where relevant:\n"
-        "- Research Question\n"
-        "- Relevant Legal Authorities\n"
-        "- Legal Analysis\n"
-        "- Arguments\n"
-        "- Counterarguments\n"
-        "- Evidentiary Gaps\n"
-        "- Research Summary\n\n"
+        "For straightforward legal questions, answer directly and concisely "
+        "with the relevant authority and its application.\n"
+        "For research requests, use only the sections necessary to address "
+        "the question. Consider relevant authorities, legal analysis, "
+        "arguments, counterarguments and evidentiary gaps where applicable. "
+        "Do not force every heading into every answer.\n"
+        "For case analysis, identify the material issues, competing "
+        "positions and relevant evidence.\n"
+        "For drafting requests, provide the complete requested document "
+        "followed by a short list of missing facts and verification points.\n\n"
+
 
         "For drafting requests, provide the document draft followed by "
         "a short list of missing facts and verification points.\n\n"

@@ -6,6 +6,7 @@ from app.models.evaluation_result import EvaluationResult
 from app.models.model_run import ModelRun
 from app.models.citation import Citation
 from app.models.draft_document import DraftDocument
+from app.models.draft_version import DraftVersion
 from app.models.ingestion_job import IngestionJob
 
 from app.models.knowledge_source import KnowledgeSource
@@ -40,6 +41,7 @@ __all__ = [
     "ModelRun",
     "Citation",
     "DraftDocument",
+    "DraftVersion",
     "IngestionJob",
     "Feedback",
     "AuditEvent",

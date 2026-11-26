@@ -11,6 +11,8 @@ from app.schemas.auth import (
     TokenResponse,
     UserLogin,
     UserRegister,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
 from app.services.auth_service import (
     authenticate_user,
@@ -21,6 +23,8 @@ from app.services.otp_service import (
     create_and_send_otp,
     resend_email_otp,
     verify_email_otp,
+    request_password_reset,
+    reset_password,
 )
 
 router = APIRouter(
@@ -132,3 +136,56 @@ def login(
 
     token = create_user_token(user)
     return TokenResponse(access_token=token)
+
+
+
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        request_password_reset(db, payload.email)
+
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    return MessageResponse(
+        message=(
+            "If a verified account exists for this email, "
+            "a password reset code has been sent."
+        )
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=MessageResponse,
+)
+def reset_password_endpoint(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        reset_password(
+            db,
+            payload.email,
+            payload.otp,
+            payload.new_password,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+    return MessageResponse(
+        message="Password reset successfully. You can now log in with your new password."
+    )

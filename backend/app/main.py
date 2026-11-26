@@ -12,6 +12,7 @@ from app.api.admin_ingestion_routes import router as admin_ingestion_router
 from app.api.health_routes import router as health_router
 from app.api.assistant_routes import router as assistant_router
 from app.core.request_id import RequestIdMiddleware
+from app.api.draft_routes import router as draft_router
 
 app = FastAPI(
     title="LawPilot AI",
@@ -50,3 +51,4 @@ app.include_router(research_router)
 app.include_router(admin_ingestion_router)
 app.include_router(health_router)
 app.include_router(assistant_router)
+app.include_router(draft_router)
