@@ -47,11 +47,24 @@ class FakeSession:
 
 
 @pytest.fixture
-def setup():
+def setup(monkeypatch):
     session = FakeSession()
     gw = ModelGateway(ModelSettings(provider="fake"), provider=FakeProvider(["Model answer"]),
                       recorder=InMemoryRunRecorder())
     orch = LegalOrchestrator(gateway=gw, classifier=RequestClassifier(gw, use_model=False))
+    monkeypatch.setattr(
+        assistant_routes,
+        "_make_retriever",
+        lambda db, current_user: lambda query, state: [
+            {
+                "chunk_id": "test-source-1",
+                "text": "Relevant legal provisions for testing.",
+                "source_title": "Test Legal Authority",
+                "citation": "Test citation",
+                "url": None,
+            }
+        ],
+    )
     app.dependency_overrides[get_db] = lambda: session
     app.dependency_overrides[assistant_routes.get_orchestrator] = lambda: orch
 
@@ -81,7 +94,7 @@ def test_chat_answers_and_saves_conversation(setup):
     client, as_user, session = setup
     as_user(user("CLIENT"))
     r = client.post("/api/v1/assistant/chat",
-                    json={"message": "Can my landlord evict me?", "use_knowledge_base": False},
+                    json={"message": "Can my landlord evict me?", "use_knowledge_base": True},
                     headers={"X-Request-ID": "abc-123"})
     assert r.status_code == 200
     body = r.json()
@@ -105,6 +118,6 @@ def test_saving_failure_still_returns_answer(setup):
     as_user(user("CLIENT"))
     session.commit = lambda: (_ for _ in ()).throw(RuntimeError("db down"))
     body = client.post("/api/v1/assistant/chat",
-                       json={"message": "Explain bail", "use_knowledge_base": False}).json()
+                       json={"message": "Explain bail", "use_knowledge_base": True}).json()
     assert body["answer"] == "Model answer"
     assert "conversation_not_saved" in body["warnings"]

@@ -29,6 +29,16 @@ def orchestrator(gw=None, **kw):
     gw = gw or gateway()
     return LegalOrchestrator(gateway=gw, classifier=RequestClassifier(gw, use_model=False), **kw)
 
+def sample_sources(query, state):
+    return [
+        {
+            "chunk_id": "test-source-1",
+            "text": "Relevant legal provisions and principles for testing.",
+            "source_title": "Test Legal Authority",
+            "citation": "Test citation",
+            "url": None,
+        }
+    ]
 
 # ---------------------------------------------------------------- classification
 @pytest.mark.parametrize("message, intent", [
@@ -72,7 +82,7 @@ def test_model_classifier_invalid_label_falls_back_to_rules():
     (["LAWYER"], "Draft a legal notice for cheque bounce", "lawyer"),
 ])
 def test_routes_to_best_permitted_agent(roles, message, agent):
-    state = orchestrator().run(message=message, roles=roles)
+    state = orchestrator(retriever=sample_sources).run(message=message, roles=roles)
     assert state["answered_by"] == agent
     assert state["status"] == "completed"
     assert agent in permissions.permitted_agents(roles)
@@ -115,7 +125,10 @@ def test_roles_are_case_insensitive():
 # ---------------------------------------------------------------- handoffs
 def test_client_drafting_handoff_denied_for_client_role():
     gw = gateway(["Here is some general information."])
-    state = orchestrator(gw).run(message="Draft a legal notice for my unpaid salary", roles=["CLIENT"])
+    state = orchestrator(gw, retriever=sample_sources).run(
+        message="Draft a legal notice for my unpaid salary",
+        roles=["CLIENT"],
+    )
     assert state["answered_by"] == "client"
     assert state["handoffs"] == [{"from": "client", "to": "lawyer", "reason": "legal document drafting",
                                   "accepted": False, "rejected_because": "not permitted for this role"}]
@@ -125,7 +138,11 @@ def test_client_drafting_handoff_denied_for_client_role():
 
 def test_client_drafting_handoff_accepted_for_admin():
     gw = gateway(["Client draft", "Lawyer final draft"])
-    state = orchestrator(gw).run(message="Draft a legal notice", roles=["ADMIN"], requested_agent="client")
+    state = orchestrator(gw, retriever=sample_sources).run(
+        message="Draft a legal notice",
+        roles=["ADMIN"],
+        requested_agent="client",
+    )
     assert state["handoffs"][0]["accepted"] is True
     assert state["answered_by"] == "lawyer" and state["answer"] == "Lawyer final draft"
     assert [o["agent"] for o in state["agent_outputs"]] == ["client", "lawyer"]
@@ -187,25 +204,40 @@ def test_state_carries_sources_history_and_trace():
 
 
 # ---------------------------------------------------------------- failures
-def test_retrieval_failure_degrades_but_answers():
+def test_retrieval_failure_returns_safe_response():
     def broken(query, state):
         raise ConnectionError("qdrant down")
 
-    state = orchestrator(gateway(["Answer"]), retriever=broken).run(message="Explain bail", roles=["CLIENT"])
-    assert state["status"] == "degraded" and state["answer"] == "Answer"
-    assert "retrieval_unavailable" in state["warnings"]
+    gw = gateway(["This answer must not be generated."])
 
+    state = orchestrator(gw, retriever=broken).run(
+        message="Explain bail",
+        roles=["CLIENT"],
+    )
+
+    assert state["status"] == "degraded"
+    assert "could not find supporting legal authorities" in state["answer"].lower()
+    assert "retrieval_unavailable" in state["warnings"]
+    assert state["citations"] == []
+    assert gw.provider.calls == []
 
 def test_model_unavailable_gives_safe_message():
-    state = orchestrator(gateway([ModelUnavailableError("down")])).run(message="Explain bail", roles=["CLIENT"])
+    state = orchestrator(
+        gateway([ModelUnavailableError("down")]),
+        retriever=sample_sources,
+    ).run(message="Explain bail", roles=["CLIENT"])
+
     assert state["status"] == "degraded"
     assert state["answer"] == MODEL_UNAVAILABLE_MESSAGE
     assert state["errors"][0]["code"] == "model_unavailable"
 
-
 def test_model_failure_after_handoff_keeps_first_answer():
     gw = gateway(["Client draft", ModelTimeoutError("slow")])
-    state = orchestrator(gw).run(message="Draft a legal notice", roles=["ADMIN"], requested_agent="client")
+    state = orchestrator(gw, retriever=sample_sources).run(
+        message="Draft a legal notice",
+        roles=["ADMIN"],
+        requested_agent="client",
+    )
     assert state["answer"] == "Client draft" and state["answered_by"] == "client"
     assert state["status"] == "degraded"
 

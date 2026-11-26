@@ -25,6 +25,7 @@ from app.api.dependencies import get_current_user
 from app.core.request_id import request_id_of
 from app.db.session import get_db
 from app.models.conversation import Conversation
+from app.models.matter import Matter
 from app.models.matter_member import MatterMember
 from app.models.message import Message
 from app.models.user import User
@@ -56,19 +57,40 @@ def get_orchestrator() -> LegalOrchestrator:
     return _orchestrator
 
 
+
 def _make_retriever(db: Session, user: User):
-    """Search the knowledge base with the same access rules as /research/search."""
+    """Search the knowledge base using the user's matter access."""
 
     def retrieve(query: str, state) -> list[dict]:
         from app.api.research_routes import get_search_service
         from app.rag.store_retriever import access_context_for
 
-        matter_ids = frozenset(
-            db.scalars(select(MatterMember.matter_id).where(MatterMember.user_id == user.id))
+        # Matters owned by the user.
+        owned_matter_ids = set(
+            db.scalars(
+                select(Matter.id).where(Matter.owner_user_id == user.id)
+            ).all()
         )
+
+        # Matters where the user is a member.
+        member_matter_ids = set(
+            db.scalars(
+                select(MatterMember.matter_id).where(
+                    MatterMember.user_id == user.id
+                )
+            ).all()
+        )
+
+        # Combine both access sources.
+        matter_ids = frozenset(owned_matter_ids | member_matter_ids)
+
         response = get_search_service().search(
-            db, query, access=access_context_for(user, matter_ids), top_k=5
+            db,
+            query,
+            access=access_context_for(user, matter_ids),
+            top_k=5,
         )
+
         return [
             {
                 "chunk_id": str(c.chunk_id),

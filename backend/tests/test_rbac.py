@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
-
+from types import SimpleNamespace
 
 DASHBOARDS = {
     "CLIENT": "/api/v1/client/dashboard",
@@ -33,10 +33,19 @@ def make_mock_user(role: str):
 
 @pytest.fixture
 def client():
-    """Create a test client without connecting to PostgreSQL."""
+    """Create a test client with a mock database session."""
+
+    class FakeDashboardDB:
+        def scalar(self, query):
+            return 0
+
+        def execute(self, query):
+            return SimpleNamespace(all=lambda: [])
+
+    fake_db = FakeDashboardDB()
 
     def override_get_db():
-        yield None
+        yield fake_db
 
     app.dependency_overrides[get_db] = override_get_db
 
@@ -44,11 +53,15 @@ def client():
         yield test_client
 
     app.dependency_overrides.clear()
-
-
+    
 @pytest.mark.parametrize(
-    "role, endpoint",
-    DASHBOARDS.items(),
+    "role,endpoint",
+    [
+        ("CLIENT", "/api/v1/client/dashboard"),
+        ("LAWYER", "/api/v1/lawyer/dashboard"),
+        ("JUDGE", "/api/v1/judge/dashboard"),
+        ("ADMIN", "/api/v1/admin/dashboard"),
+    ],
 )
 def test_correct_role_can_access_dashboard(client, role, endpoint):
     """Each role should access its own dashboard."""

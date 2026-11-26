@@ -1,6 +1,6 @@
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import {  Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout.jsx'
 import { postAuth } from '../services/auth.js'
 import api from '../services/api.js'
@@ -82,7 +82,9 @@ function LoginPage() {
             required
           />
         </label>
-
+        <div className="forgot-password-link">
+          <Link to="/forgot-password">Forgot Password?</Link>
+        </div>
         {error && (
           <div className="notice notice-error" role="alert">
             {error}

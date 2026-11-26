@@ -305,8 +305,19 @@ class LegalOrchestrator:
                 "\n\nNote: preparing a formal legal document needs a qualified advocate. "
                 "Please consult a lawyer, who can draft it for your specific situation."
             )
-        status = STATUS_DEGRADED if any(w in warnings for w in (
-            "retrieval_unavailable", "model_unavailable", "model_timeout", "model_bad_response")) else STATUS_COMPLETED
+        status = (
+            STATUS_DEGRADED
+            if (
+                any(w in warnings for w in (
+                    "retrieval_unavailable",
+                    "model_unavailable",
+                    "model_timeout",
+                    "model_bad_response",
+                ))
+                or final.get("metadata", {}).get("safe_fallback")
+            )
+            else STATUS_COMPLETED
+        )
         return {"answer": answer, "answered_by": final["agent"],
                 "citations": final.get("citations", []), "status": status, "trace": ["finalize"]}
 

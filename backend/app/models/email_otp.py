@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,7 +10,12 @@ from app.db.base import Base
 
 class EmailOTP(Base):
     __tablename__ = "email_otps"
-
+    __table_args__ = (
+        CheckConstraint(
+            "purpose IN ('email_verification', 'password_reset')",
+            name="ck_email_otps_purpose",
+        ),
+    )
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
@@ -27,6 +32,13 @@ class EmailOTP(Base):
     otp_hash: Mapped[str] = mapped_column(
         String,
         nullable=False,
+    )
+
+    purpose: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="email_verification",
+        server_default="email_verification",
     )
 
     expires_at: Mapped[datetime] = mapped_column(
