@@ -20,7 +20,7 @@ services:
       POSTGRES_USER: legal_ai_user
       POSTGRES_PASSWORD: local_dev_password
     ports:
-      - "5432:5432"
+      - "5433:5432"   # host 5433: a native Windows Postgres often already uses 5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

@@ -140,7 +140,7 @@ Create the first administrator with `python scripts/create_admin.py` (from `back
 cd backend
 pytest                                   # unit tests, no database needed
 # + integration tests against the Docker Postgres (rolled back, leave no data):
-TEST_DATABASE_URL=postgresql+psycopg://legal_ai_user:local_dev_password@localhost:5432/legal_ai pytest
+TEST_DATABASE_URL=postgresql+psycopg://legal_ai_user:local_dev_password@localhost:5433/legal_ai pytest
 # end-to-end check of a running backend (upload -> process -> search -> audit):
 python scripts/smoke_test.py --email <admin email> --password <admin password>
 ```

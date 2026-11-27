@@ -8,7 +8,7 @@ All backend settings are environment variables, read from `backend/.env` (copy
 | Variable | Example | Notes |
 | --- | --- | --- |
 | `JWT_SECRET_KEY` | 64 random characters | **The backend does not start without it.** Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Changing it signs everyone out. |
-| `DATABASE_URL` | `postgresql+psycopg://legal_ai_user:local_dev_password@localhost:5432/legal_ai` | Docker overrides the host to `postgres`. |
+| `DATABASE_URL` | `postgresql+psycopg://legal_ai_user:local_dev_password@localhost:5433/legal_ai` | Docker overrides the host to `postgres`. |
 
 ## Application and authentication
 

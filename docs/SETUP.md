@@ -27,7 +27,7 @@ ollama pull qwen2.5:7b-instruct
 docker compose up -d postgres qdrant
 ```
 
-PostgreSQL listens on 5432 and Qdrant on 6333 (dashboard: http://localhost:6333/dashboard).
+PostgreSQL listens on 5433 (host port; 5432 is often taken by a native Windows Postgres) and Qdrant on 6333 (dashboard: http://localhost:6333/dashboard).
 To run the backend in Docker too, use `docker compose up -d --build` and skip step 4's `uvicorn`.
 
 ## 4. Backend
@@ -98,7 +98,7 @@ On the demo PC, `start_demo.bat` starts the backend and frontend and opens these
 ```bash
 cd backend
 pytest                                   # 464 tests, no database needed
-TEST_DATABASE_URL=postgresql+psycopg://legal_ai_user:local_dev_password@localhost:5432/legal_ai pytest
+TEST_DATABASE_URL=postgresql+psycopg://legal_ai_user:local_dev_password@localhost:5433/legal_ai pytest
 python scripts/smoke_test.py --email <admin email> --password <admin password>
 python scripts/evaluate_model.py         # model evaluation, a few minutes on CPU
 cd ../frontend && npm run lint && npm run build

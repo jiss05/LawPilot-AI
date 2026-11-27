@@ -17,7 +17,11 @@ function getErrorMessage(detail) {
   return ''
 }
 
+const REQUEST_TIMEOUT_MS = 20000
+
 export async function postAuth(endpoint, payload) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   let response
 
   try {
@@ -25,16 +29,31 @@ export async function postAuth(endpoint, payload) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     })
-  } catch {
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('The server took too long to respond. Check that the backend and database are running.')
+    }
     throw new Error('Could not reach the server. Check your connection and try again.')
+  } finally {
+    clearTimeout(timer)
   }
 
-  const result = await response.json()
+  // A crashed backend can return plain text ("Internal Server Error"), not JSON.
+  let result = {}
+  try {
+    result = await response.json()
+  } catch {
+    result = {}
+  }
 
   if (!response.ok) {
     throw new Error(
-      getErrorMessage(result.detail) || 'Something went wrong. Please try again.',
+      getErrorMessage(result.detail) ||
+        (response.status >= 500
+          ? 'Server error. Check the backend terminal for details.'
+          : 'Something went wrong. Please try again.'),
     )
   }
 

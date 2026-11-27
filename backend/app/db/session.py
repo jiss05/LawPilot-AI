@@ -18,6 +18,9 @@ if not DATABASE_URL:
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
+    # Fail fast if Postgres is down or the port is wrong, instead of
+    # hanging the request (and the "Signing in..." button) forever.
+    connect_args={"connect_timeout": 5},
 )
 
 # Create a database session factory
