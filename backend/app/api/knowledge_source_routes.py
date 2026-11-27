@@ -9,10 +9,12 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     UploadFile,
     status,
 )
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -343,3 +345,58 @@ def withdraw_source_version(
     db.commit()
     db.refresh(version)
     return VersionActionResponse(version=_version_response(db, version))
+
+
+# ---------------------------------------------------------------------------
+# Delete a source and everything derived from it
+# ---------------------------------------------------------------------------
+class SourceDeleteResponse(BaseModel):
+    source_id: UUID
+    title: str
+    versions: int
+    documents: int
+    chunks: int
+    files_deleted: int
+    warnings: list[str] = []
+
+
+@router.delete("/{source_id}", response_model=SourceDeleteResponse)
+def delete_legal_source_route(
+    source_id: UUID,
+    request: Request,
+    force: bool = Query(False, description="Delete even if a document is still being processed"),
+    current_user: User = Depends(require_roles("ADMIN")),
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently delete a legal source: all its editions and documents, their
+    chunks in PostgreSQL, their vectors in Qdrant and the stored files.
+    """
+    from app.services.source_deletion import (
+        SourceBusy,
+        SourceNotFound,
+        VectorStoreUnavailable,
+        delete_legal_source,
+    )
+
+    try:
+        result = delete_legal_source(
+            db,
+            source_id,
+            actor_user_id=current_user.id,
+            request_id=request_id_of(request),
+            force=force,
+        )
+    except SourceNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Legal source not found.")
+    except SourceBusy as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Still being processed: {exc}. Wait for it to finish, or delete with force.",
+        )
+    except VectorStoreUnavailable:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The vector database (Qdrant) could not be reached, so nothing was deleted. Try again when it is running.",
+        )
+    return SourceDeleteResponse(**vars(result))

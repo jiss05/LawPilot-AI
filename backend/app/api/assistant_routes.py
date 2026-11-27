@@ -32,6 +32,8 @@ from app.models.user import User
 from app.orchestration import permissions
 from app.orchestration.graph import LegalOrchestrator
 from app.orchestration.state import STATUS_FORBIDDEN
+from app.models.feedback import Feedback
+from app.schemas.evaluation import FeedbackCreateRequest, FeedbackCreateResponse
 from app.schemas.assistant import (
     AgentInfo,
     AgentListResponse,
@@ -98,6 +100,8 @@ def _make_retriever(db: Session, user: User):
                 "source_title": c.source.source_title,
                 "citation": c.source.citation,
                 "url": c.source.url,
+                "page_number": c.source.page_number,
+                "section_ref": c.source.section_ref,
             }
             for c in response.results
         ]
@@ -153,8 +157,9 @@ def chat(
                             detail="You do not have permission to use this assistant.")
 
     warnings = list(dict.fromkeys(state.get("warnings", [])))
+    message_id = None
     try:
-        conversation = _save_turn(db, conversation, current_user, roles, body.message, state)
+        conversation, message_id = _save_turn(db, conversation, current_user, roles, body.message, state)
     except Exception:
         db.rollback()
         logger.warning("Could not save conversation turn request_id=%s", request_id, exc_info=True)
@@ -163,7 +168,10 @@ def chat(
     return ChatResponse(
         request_id=state.get("request_id", request_id or ""),
         conversation_id=conversation.id if conversation else None,
+        message_id=message_id,
         status=state.get("status", "failed"),
+        reliable=bool(state.get("reliable")) and state.get("status") == "completed",
+        notice=state.get("notice"),
         answer=state.get("answer", ""),
         answered_by=state.get("answered_by"),
         intent=state.get("intent"),
@@ -171,6 +179,8 @@ def chat(
         citations=[Citation(**c) for c in state.get("citations", [])],
         handoffs=[Handoff(**h) for h in state.get("handoffs", [])],
         warnings=warnings,
+        verification=state.get("verification") or {},
+        conflicts=state.get("conflicts") or [],
         trace=state.get("trace", []),
     )
 
@@ -210,12 +220,44 @@ def _save_turn(db, conversation, user, roles, message, state) -> Conversation:
         db.flush()
     db.add(Message(conversation_id=conversation.id, sender_type="user", content=message, status="received"))
     run_ids = state.get("model_run_ids") or []
-    db.add(Message(
+    answer = Message(
         conversation_id=conversation.id,
         sender_type="assistant",
         content=state.get("answer", ""),
         status=state.get("status", "failed"),
         model_run_id=UUID(run_ids[-1]) if run_ids else None,
-    ))
+    )
+    db.add(answer)
     db.commit()
-    return conversation
+    return conversation, answer.id
+
+
+@router.post("/feedback", response_model=FeedbackCreateResponse, status_code=status.HTTP_201_CREATED)
+def give_feedback(
+    body: FeedbackCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Rate an assistant answer (SCRUM-29). Only answers in your own conversations."""
+    message = db.scalar(
+        select(Message)
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .where(
+            Message.id == body.message_id,
+            Message.sender_type == "assistant",
+            Conversation.owner_user_id == current_user.id,
+            Conversation.deleted_at.is_(None),
+        )
+    )
+    if message is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Answer not found.")
+    feedback = Feedback(
+        user_id=current_user.id,
+        message_id=message.id,
+        rating=body.rating,
+        issue_type=body.issue_type,
+        comment=(body.comment or None),
+    )
+    db.add(feedback)
+    db.commit()
+    return FeedbackCreateResponse(id=feedback.id, message_id=message.id, rating=feedback.rating)

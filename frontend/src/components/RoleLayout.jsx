@@ -5,6 +5,7 @@ import {
   UserCircle,
   LogOut,
   Scale,
+  FileText,
 } from 'lucide-react'
 
 import { useEffect, useState } from 'react'
@@ -47,6 +48,9 @@ function RoleLayout({ role }) {
       path: `/${role}`,
       icon: LayoutDashboard,
     },
+    ...(role === 'lawyer'
+      ? [{ name: 'Drafts', path: '/lawyer/drafts', icon: FileText }]
+      : []),
     {
       name: 'Profile',
       path: `/${role}/profile`,

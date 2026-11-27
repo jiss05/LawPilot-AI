@@ -6,6 +6,7 @@ import {
   UserCircle,
   LogOut,
   Scale,
+  Activity,
 } from 'lucide-react'
 
 import './AdminLayout.css'
@@ -22,6 +23,7 @@ function AdminLayout() {
     { name: 'Overview', path: '/admin', icon: LayoutDashboard },
     { name: 'User Management', path: '/admin/users', icon: Users },
     { name: 'Legal Sources', path: '/admin/legal-sources', icon: BookOpen },
+    { name: 'Monitoring', path: '/admin/monitoring', icon: Activity },
     { name: 'Profile', path: '/admin/profile', icon: UserCircle },
   ]
 

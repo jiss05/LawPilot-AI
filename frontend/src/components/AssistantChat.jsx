@@ -1,11 +1,107 @@
 
 import { useEffect, useRef, useState } from 'react'
-import { Send, Plus, FileText, AlertCircle, LoaderCircle } from 'lucide-react'
+import {
+  Send,
+  Plus,
+  FileText,
+  AlertCircle,
+  LoaderCircle,
+  ThumbsUp,
+  ThumbsDown,
+} from 'lucide-react'
 import {
   getAvailableAgents,
   sendAssistantMessage,
+  sendFeedback,
 } from '../services/assistant'
+import { errorMessage, warningText } from '../services/errors'
+import { CitationList, ReliabilityNotice } from './Verification'
 import './AssistantChat.css'
+
+const AGENT_TEXT = {
+  lawyer: {
+    title: 'Lawyer AI Assistant',
+    subtitle: 'Research legal authorities and prepare evidence-based arguments.',
+  },
+  judge_support: {
+    title: 'Judge Support Assistant',
+    subtitle:
+      'Neutral summaries of facts, issues and applicable law. It never recommends an outcome.',
+  },
+  client: {
+    title: 'Legal AI Assistant',
+    subtitle: 'Ask legal questions and receive clear, source-supported guidance.',
+  },
+}
+
+const ISSUE_TYPES = [
+  ['incorrect', 'Incorrect'],
+  ['unsupported_citation', 'Wrong or missing source'],
+  ['incomplete', 'Incomplete'],
+  ['not_neutral', 'Not neutral'],
+  ['unclear', 'Unclear'],
+  ['other', 'Other'],
+]
+
+function FeedbackBar({ messageId }) {
+  const [state, setState] = useState('idle') // idle | choosing | sending | sent | error
+  const [issue, setIssue] = useState('incorrect')
+
+  if (!messageId) return null
+
+  async function send(rating, issueType) {
+    setState('sending')
+    try {
+      await sendFeedback({ messageId, rating, issueType })
+      setState('sent')
+    } catch {
+      setState('error')
+    }
+  }
+
+  if (state === 'sent') {
+    return <p className="assistant-feedback-done">Thanks for your feedback.</p>
+  }
+
+  return (
+    <div className="assistant-feedback">
+      <span>Was this helpful?</span>
+      <button
+        type="button"
+        aria-label="Helpful"
+        onClick={() => send(5, null)}
+        disabled={state === 'sending'}
+      >
+        <ThumbsUp size={15} />
+      </button>
+      <button
+        type="button"
+        aria-label="Not helpful"
+        onClick={() => setState('choosing')}
+        disabled={state === 'sending'}
+      >
+        <ThumbsDown size={15} />
+      </button>
+
+      {state === 'choosing' && (
+        <>
+          <select value={issue} onChange={(event) => setIssue(event.target.value)}>
+            {ISSUE_TYPES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="assistant-feedback-send" onClick={() => send(2, issue)}>
+            Send
+          </button>
+        </>
+      )}
+
+      {state === 'error' && <span className="assistant-feedback-error">Could not send.</span>}
+    </div>
+  )
+}
 
 function AssistantChat({ agent }) {
   const [messages, setMessages] = useState([])
@@ -43,8 +139,7 @@ function AssistantChat({ agent }) {
       } catch (err) {
         if (!active) return
         setAgentError(
-          err.response?.data?.detail ||
-            'Unable to load the available legal assistants.',
+          errorMessage(err, 'Unable to load the available legal assistants.'),
         )
       }
     }
@@ -60,16 +155,7 @@ function AssistantChat({ agent }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  function getErrorMessage(err) {
-    const detail = err.response?.data?.detail
-
-    if (typeof detail === 'string') return detail
-    if (Array.isArray(detail)) {
-      return detail.map((item) => item.msg).join(', ')
-    }
-
-    return 'Something went wrong. Please try again.'
-  }
+  const text = AGENT_TEXT[agent] || AGENT_TEXT.client
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -106,10 +192,14 @@ function AssistantChat({ agent }) {
           citations: response.citations || [],
           warnings: response.warnings || [],
           status: response.status,
+          reliable: Boolean(response.reliable),
+          notice: response.notice,
+          invalidReferences: response.verification?.invalid_references || [],
+          messageId: response.message_id,
         },
       ])
     } catch (err) {
-      setError(getErrorMessage(err))
+      setError(errorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -124,31 +214,12 @@ function AssistantChat({ agent }) {
     setError('')
   }
 
-  function isValidExternalUrl(value) {
-    if (!value) return false
-
-    try {
-      const url = new URL(value)
-      return url.protocol === 'https:' || url.protocol === 'http:'
-    } catch {
-      return false
-    }
-  }
-
   return (
     <div className="assistant-chat">
       <div className="assistant-chat-header">
         <div>
-          <h2>
-            {agent === 'lawyer'
-              ? 'Lawyer AI Assistant'
-              : 'Legal AI Assistant'}
-          </h2>
-          <p>
-            {agent === 'lawyer'
-              ? 'Research legal authorities and prepare evidence-based arguments.'
-              : 'Ask legal questions and receive clear, source-supported guidance.'}
-          </p>
+          <h2>{text.title}</h2>
+          <p>{text.subtitle}</p>
         </div>
 
         <button
@@ -196,51 +267,32 @@ function AssistantChat({ agent }) {
               {message.role === 'user' ? 'You' : 'LawPilot AI'}
             </div>
 
+            {message.role === 'assistant' && (
+              <ReliabilityNotice reliable={message.reliable} notice={message.notice} />
+            )}
+
             <div className="assistant-message-content">
               {message.content}
             </div>
 
-            {message.warnings?.length > 0 && (
+            {message.warnings?.some((w) => warningText(w)) && (
               <div className="assistant-warnings">
-                {message.warnings.map((warning, warningIndex) => (
-                  <p key={warningIndex}>{warning}</p>
-                ))}
+                {[...new Set(message.warnings.map(warningText).filter(Boolean))].map(
+                  (warning) => (
+                    <p key={warning}>{warning}</p>
+                  ),
+                )}
               </div>
             )}
 
-            {message.citations?.length > 0 && (
-              <div className="assistant-citations">
-                <h4>
-                  <FileText size={16} />
-                  Legal Sources
-                </h4>
-
-                {message.citations.map((citation, citationIndex) => (
-                  <div
-                    className="assistant-citation"
-                    key={citation.chunk_id || citation.ref || citationIndex}
-                  >
-                    <strong>
-                      {citation.source_title || 'Legal source'}
-                    </strong>
-
-                    {citation.citation && (
-                      <p>{citation.citation}</p>
-                    )}
-
-                    {isValidExternalUrl(citation.url) && (
-                      <a
-                        href={citation.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        View source
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
+            {message.role === 'assistant' && (
+              <CitationList
+                citations={message.citations}
+                invalidReferences={message.invalidReferences}
+              />
             )}
+
+            {message.role === 'assistant' && <FeedbackBar messageId={message.messageId} />}
           </div>
         ))}
 

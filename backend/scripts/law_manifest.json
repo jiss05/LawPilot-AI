@@ -1,0 +1,197 @@
+{
+ "_comment": "Core central Acts of India for the LawPilot knowledge base. Source: India Code (indiacode.nic.in), the official repository of the Legislative Department, Ministry of Law and Justice. 'handle' is the Act's India Code page; the importer finds the English PDF there. 'pdf_urls' are tried first, in order; the last ones are official fallbacks. Add an entry to import another Act.",
+ "acts": [
+  {
+   "slug": "bns",
+   "title": "Bharatiya Nyaya Sanhita, 2023",
+   "act": "Act No. 45 of 2023",
+   "enacted": "2023-12-25",
+   "area": "Criminal offences and punishments: theft, cheating, assault (replaced the IPC, 1860)",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/20062",
+   "pdf_urls": [
+    "https://www.indiacode.nic.in/bitstream/123456789/20062/1/a202345.pdf",
+    "https://prsindia.org/files/bills_acts/bills_parliament/2023/The Bharatiya Nyaya Sanhita, 2023.pdf"
+   ]
+  },
+  {
+   "slug": "bnss",
+   "title": "Bharatiya Nagarik Suraksha Sanhita, 2023",
+   "act": "Act No. 46 of 2023",
+   "enacted": "2023-12-25",
+   "area": "Criminal procedure: arrest, bail, investigation, trial (replaced the CrPC, 1973)",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/21595",
+   "pdf_urls": [
+    "https://indiacode.nic.in/bitstream/123456789/20099/3/a2023-46.pdf",
+    "https://prsindia.org/files/bills_acts/bills_parliament/2023/The Bharatiya Nagarik Suraksha Sanhita, 2023.pdf"
+   ]
+  },
+  {
+   "slug": "bsa",
+   "title": "Bharatiya Sakshya Adhiniyam, 2023",
+   "act": "Act No. 47 of 2023",
+   "enacted": "2023-12-25",
+   "area": "Evidence (replaced the Indian Evidence Act, 1872)",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/20063",
+   "pdf_urls": [
+    "https://www.indiacode.nic.in/bitstream/123456789/20063/1/aa202347.pdf",
+    "https://prsindia.org/files/bills_acts/acts_parliament/2023/The Bharatiya Sakshya Bill, 2023.pdf"
+   ]
+  },
+  {
+   "slug": "dpdp",
+   "title": "Digital Personal Data Protection Act, 2023",
+   "act": "Act No. 22 of 2023",
+   "enacted": "2023-08-11",
+   "area": "Personal data and privacy",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/22037",
+   "pdf_urls": [
+    "https://www.indiacode.nic.in/bitstream/123456789/22037/2/a2023-22.pdf"
+   ]
+  },
+  {
+   "slug": "cpa",
+   "title": "Consumer Protection Act, 2019",
+   "act": "Act No. 35 of 2019",
+   "enacted": "2019-08-09",
+   "area": "Consumer rights and consumer commissions",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/15256",
+   "pdf_urls": [
+    "https://prsindia.org/files/bills_acts/bills_parliament/2021/Consumer Protection Act 2019.pdf",
+    "https://www.indiacode.nic.in/bitstream/123456789/18964/1/cpa.pdf"
+   ]
+  },
+  {
+   "slug": "it",
+   "title": "Information Technology Act, 2000",
+   "act": "Act No. 21 of 2000",
+   "enacted": "2000-06-09",
+   "area": "Cyber offences, electronic records and signatures",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/1999",
+   "pdf_urls": [
+    "https://prsindia.org/files/bills_acts/bills_parliament/2021/IT Act, 2000.pdf"
+   ]
+  },
+  {
+   "slug": "ni",
+   "title": "Negotiable Instruments Act, 1881",
+   "act": "Act No. 26 of 1881",
+   "enacted": "1881-12-09",
+   "area": "Cheques, promissory notes, cheque bounce (Section 138)",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/2189",
+   "pdf_urls": [
+    "https://financialservices.gov.in/beta/sites/default/files/2022-10/1. Negotiable Instrument Act, 1881.pdf"
+   ]
+  },
+  {
+   "slug": "cpc",
+   "title": "Code of Civil Procedure, 1908",
+   "act": "Act No. 5 of 1908",
+   "enacted": "1908-03-21",
+   "area": "Civil suits, appeals and execution",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/2191",
+   "pdf_urls": []
+  },
+  {
+   "slug": "limitation",
+   "title": "Limitation Act, 1963",
+   "act": "Act No. 36 of 1963",
+   "enacted": "1963-10-05",
+   "area": "Time limits for suits and applications",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/1565",
+   "pdf_urls": []
+  },
+  {
+   "slug": "sra",
+   "title": "Specific Relief Act, 1963",
+   "act": "Act No. 47 of 1963",
+   "enacted": "1963-12-13",
+   "area": "Specific performance, injunctions, recovery of possession",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/1583",
+   "pdf_urls": []
+  },
+  {
+   "slug": "tpa",
+   "title": "Transfer of Property Act, 1882",
+   "act": "Act No. 4 of 1882",
+   "enacted": "1882-02-17",
+   "area": "Sale, mortgage, lease and gift of property",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/2338",
+   "pdf_urls": []
+  },
+  {
+   "slug": "arbitration",
+   "title": "Arbitration and Conciliation Act, 1996",
+   "act": "Act No. 26 of 1996",
+   "enacted": "1996-08-16",
+   "area": "Arbitration and conciliation",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/1978",
+   "pdf_urls": [
+    "https://www.indiacode.nic.in/bitstream/123456789/1978/1/A199626.pdf"
+   ]
+  },
+  {
+   "slug": "hma",
+   "title": "Hindu Marriage Act, 1955",
+   "act": "Act No. 25 of 1955",
+   "enacted": "1955-05-18",
+   "area": "Marriage, divorce, maintenance among Hindus",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/1560",
+   "pdf_urls": []
+  },
+  {
+   "slug": "hsa",
+   "title": "Hindu Succession Act, 1956",
+   "act": "Act No. 30 of 1956",
+   "enacted": "1956-06-17",
+   "area": "Inheritance among Hindus, daughters' coparcenary rights",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/1713",
+   "pdf_urls": [
+    "https://www.cra.tn.gov.in/tnscs/Files/act/014a_Hindu sucession act 1956.pdf"
+   ]
+  },
+  {
+   "slug": "dv",
+   "title": "Protection of Women from Domestic Violence Act, 2005",
+   "act": "Act No. 43 of 2005",
+   "enacted": "2005-09-13",
+   "area": "Domestic violence: protection, residence and monetary relief",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/2021",
+   "pdf_urls": [
+    "https://cdn.ncw.gov.in/wp-content/uploads/2022/12/TheProtectionofWomenfromDomesticViolenceAct2005_0.pdf"
+   ]
+  },
+  {
+   "slug": "posh",
+   "title": "Sexual Harassment of Women at Workplace (Prevention, Prohibition and Redressal) Act, 2013",
+   "act": "Act No. 14 of 2013",
+   "enacted": "2013-04-22",
+   "area": "Workplace sexual harassment, internal committees",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/2104",
+   "pdf_urls": [
+    "https://ncte.gov.in/Website/PDF/A2013-14.pdf"
+   ]
+  },
+  {
+   "slug": "pocso",
+   "title": "Protection of Children from Sexual Offences Act, 2012",
+   "act": "Act No. 32 of 2012",
+   "enacted": "2012-06-19",
+   "area": "Sexual offences against children, special courts",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/2079",
+   "pdf_urls": [
+    "https://wcd.nic.in/sites/default/files/POCSO Act, 2012.pdf"
+   ]
+  },
+  {
+   "slug": "rti",
+   "title": "Right to Information Act, 2005",
+   "act": "Act No. 22 of 2005",
+   "enacted": "2005-06-15",
+   "area": "Right to information from public authorities",
+   "handle": "https://www.indiacode.nic.in/handle/123456789/2065",
+   "pdf_urls": [
+    "https://www.heavyindustries.gov.in/sites/default/files/2023-10/rti_act_2005.pdf"
+   ]
+  }
+ ]
+}

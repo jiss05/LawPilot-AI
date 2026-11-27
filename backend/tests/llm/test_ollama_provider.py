@@ -104,6 +104,10 @@ def test_health_when_server_down():
 
 
 def test_settings_accept_legacy_env_names(monkeypatch):
+    # app.db.session calls load_dotenv(), which can put the new-style names
+    # from a developer's .env into the environment; those would win.
+    monkeypatch.delenv("LLM_OLLAMA_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
     monkeypatch.setenv("OLLAMA_MODEL", "qwen2.5:14b")
     s = ModelSettings(_env_file=None)

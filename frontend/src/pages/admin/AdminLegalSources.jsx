@@ -7,6 +7,9 @@ import {
   Plus,
   X,
   Upload,
+  Trash2,
+  AlertTriangle,
+  LoaderCircle,
 } from 'lucide-react'
 
 import api from '../../services/api'
@@ -21,6 +24,60 @@ function AdminLegalSources() {
   const [showForm, setShowForm] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [success, setSuccess] = useState('')
+
+  // Delete a source (and its chunks, vectors and files)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
+
+  const openDelete = (source) => {
+    setDeleteTarget(source)
+    setDeleteError('')
+    setDeleteBusy(false)
+  }
+
+  const closeDelete = () => {
+    if (deleting) return
+    setDeleteTarget(null)
+  }
+
+  const confirmDelete = async (force = false) => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setDeleteError('')
+
+    try {
+      const response = await api.delete(`/knowledge-sources/${deleteTarget.id}`, {
+        params: force ? { force: true } : {},
+      })
+      const result = response.data
+
+      setSources((previous) => previous.filter((s) => s.id !== deleteTarget.id))
+      setDocumentsBySource((previous) => {
+        const next = { ...previous }
+        delete next[deleteTarget.id]
+        return next
+      })
+      setSuccess(
+        `Deleted "${result.title}": ${result.documents} document(s), ${result.chunks} chunks ` +
+        `and their vectors, and ${result.files_deleted} stored file(s).` +
+        (result.warnings?.length ? ` ${result.warnings.join(' ')}` : '')
+      )
+      setDeleteTarget(null)
+    } catch (err) {
+      const status = err.response?.status
+      const detail = err.response?.data?.detail
+      setDeleteBusy(status === 409)
+      setDeleteError(
+        typeof detail === 'string'
+          ? detail
+          : 'The legal source could not be deleted. Please try again.'
+      )
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const [form, setForm] = useState({
     title: '',
@@ -494,19 +551,20 @@ function AdminLegalSources() {
               <th>Documents & Access Level</th>
               <th>Publisher</th>
               <th>Registered</th>
+              <th aria-label="Actions" />
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7" className="legal-sources-message">
+                <td colSpan="8" className="legal-sources-message">
                   Loading legal sources...
                 </td>
               </tr>
             ) : filteredSources.length === 0 ? (
               <tr>
-                <td colSpan="7" className="legal-sources-message">
+                <td colSpan="8" className="legal-sources-message">
                   {search
                     ? 'No matching legal sources found.'
                     : 'No legal sources have been registered yet.'}
@@ -578,6 +636,19 @@ function AdminLegalSources() {
                         ? new Date(source.created_at).toLocaleDateString()
                         : '—'}
                     </td>
+
+                    <td>
+                      <button
+                        type="button"
+                        className="legal-source-delete"
+                        onClick={() => openDelete(source)}
+                        aria-label={`Delete ${source.title}`}
+                        title="Delete this source"
+                      >
+                        <Trash2 size={16} />
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 )
               })
@@ -585,6 +656,56 @@ function AdminLegalSources() {
           </tbody>
         </table>
       </div>
+
+      {deleteTarget && (
+        <div className="legal-delete-backdrop" role="presentation" onClick={closeDelete}>
+          <div
+            className="legal-delete-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="legal-delete-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="legal-delete-icon">
+              <AlertTriangle size={22} />
+            </div>
+            <h2 id="legal-delete-title">Delete “{deleteTarget.title}”?</h2>
+            <p>This permanently removes, for every edition of this source:</p>
+            <ul>
+              <li>
+                {(documentsBySource[deleteTarget.id] || []).length} document(s):{' '}
+                {(documentsBySource[deleteTarget.id] || []).map((d) => d.filename).join(', ') || 'none'}
+              </li>
+              <li>all text chunks and metadata in PostgreSQL</li>
+              <li>all embeddings (vectors) in Qdrant</li>
+              <li>the stored PDF and extracted text files</li>
+            </ul>
+            <p className="legal-delete-note">
+              Assistants will no longer find or cite it. This cannot be undone; you would need
+              to upload the PDF again. The deletion is recorded in the audit log.
+            </p>
+
+            {deleteError && <div className="legal-sources-error">{deleteError}</div>}
+
+            <div className="legal-delete-actions">
+              <button type="button" className="legal-delete-cancel" onClick={closeDelete} disabled={deleting}>
+                Cancel
+              </button>
+              {deleteBusy ? (
+                <button type="button" className="legal-delete-confirm" onClick={() => confirmDelete(true)} disabled={deleting}>
+                  {deleting ? <LoaderCircle size={16} className="assistant-spinner" /> : <Trash2 size={16} />}
+                  Delete anyway
+                </button>
+              ) : (
+                <button type="button" className="legal-delete-confirm" onClick={() => confirmDelete(false)} disabled={deleting}>
+                  {deleting ? <LoaderCircle size={16} className="assistant-spinner" /> : <Trash2 size={16} />}
+                  {deleting ? 'Deleting...' : 'Delete permanently'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

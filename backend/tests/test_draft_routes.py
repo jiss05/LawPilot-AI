@@ -325,7 +325,7 @@ def test_export_before_self_review_is_rejected(
     )
 
     assert response.status_code == 409
-    assert "Review the draft yourself" in response.json()["detail"]
+    assert "approved by an authorized reviewer" in response.json()["detail"]
 
 
 def test_self_review_changes_draft_status(
@@ -372,7 +372,7 @@ def test_exported_draft_cannot_be_edited(
 
 
 
-def test_reviewed_draft_exports_as_word_document(
+def test_approved_draft_exports_as_word_document(
     client,
     monkeypatch,
 ):
@@ -380,8 +380,9 @@ def test_reviewed_draft_exports_as_word_document(
     from docx import Document
 
     user = make_mock_user("LAWYER")
-    draft = make_mock_draft(user.id, status="reviewed")
+    draft = make_mock_draft(user.id, status="approved")
     draft.reviewed_at = datetime.now(timezone.utc)
+    draft.approved_at = datetime.now(timezone.utc)
 
     setup_draft_test(client, monkeypatch, draft, user)
 

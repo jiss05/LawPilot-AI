@@ -24,6 +24,7 @@ from app.agents.base import (
 )
 from app.llm.gateway import ModelGateway
 from app.llm.types import ChatMessage, GenerationRequest
+from app.safety.responses import RETRIEVAL_UNAVAILABLE_MESSAGE
 from app.orchestration.state import (
     INTENT_CASE_ANALYSIS,
     INTENT_DOCUMENT_DRAFTING,
@@ -46,7 +47,19 @@ _GROUNDING = (
     "that the available legal sources are insufficient.\n"
     "Distinguish established information from unanswered questions and "
     "identify what additional evidence is needed when relevant.\n"
-    "Do not use general model knowledge to fill gaps in legal evidence.\n\n"
+    "Do not use general model knowledge to fill gaps in legal evidence.\n"
+    "Only put words in quotation marks when they appear word for word in "
+    "the cited source.\n"
+    "Never name a section, article, rule, Act or Code that does not appear "
+    "in the SOURCES, even if you believe it applies. Every provision you name "
+    "is checked against the sources, and an answer naming unsupported law is "
+    "rejected as unreliable.\n"
+    "If none of the SOURCES is actually about the question (for example they "
+    "share a word but concern a different subject), say that the available "
+    "legal sources do not cover this question and stop; do not answer from "
+    "general knowledge.\n"
+    "If two supplied sources disagree (for example two editions of the same "
+    "provision), say so explicitly and cite both; do not silently pick one.\n\n"
 
     "RESPONSE QUALITY AND LENGTH:\n"
     "Answer the exact question asked before providing additional context.\n"
@@ -71,6 +84,11 @@ NO_LEGAL_EVIDENCE_MESSAGE = (
     "rephrasing the question or ask the administrator to add the relevant "
     "legal materials to the knowledge base."
 )
+
+# Agents that must have retrieved legal evidence before calling the model.
+EVIDENCE_REQUIRED_AGENTS = (CLIENT_AGENT, LAWYER_AGENT, JUDGE_SUPPORT_AGENT)
+
+
 def format_sources(sources: list[dict[str, Any]]) -> str:
     if not sources:
         return "SOURCES: none found in the knowledge base."
@@ -91,6 +109,8 @@ def citations_for(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "source_title": s.get("source_title"),
             "citation": s.get("citation"),
             "url": s.get("url"),
+            "page_number": s.get("page_number"),
+            "section_ref": s.get("section_ref"),
         }
         for i, s in enumerate(sources, 1)
     ]
@@ -140,9 +160,17 @@ class PromptAgent:
         return None, None
 
     def run(self, ctx: AgentContext, gateway: ModelGateway) -> AgentResult:
-        # Client and Lawyer Agents must have retrieved legal evidence.
-        # Do not call the LLM when retrieval returned no sources.
-        if self.name in (CLIENT_AGENT, LAWYER_AGENT) and not ctx.sources:
+        # Agents must have retrieved legal evidence. Do not call the LLM when
+        # retrieval returned no sources, and say WHY there is no answer:
+        # nothing relevant found vs. the knowledge base being unavailable.
+        if self.name in EVIDENCE_REQUIRED_AGENTS and not ctx.sources:
+            if ctx.retrieval_failed:
+                return AgentResult(
+                    content=RETRIEVAL_UNAVAILABLE_MESSAGE,
+                    citations=[],
+                    metadata={"evidence": "unavailable", "safe_fallback": True},
+                )
+
             handoff_to, reason = self.handoff(ctx)
 
             return AgentResult(
@@ -280,14 +308,47 @@ class LawyerAgent(PromptAgent):
 
 
 class JudgeSupportAgent(PromptAgent):
+    """
+    SCRUM-25 Judge Support Agent (chat). Structured case briefs are built by
+    app.agents.case_brief; both pass through the neutrality guard.
+    """
+
     name = JUDGE_SUPPORT_AGENT
     description = "Neutral case analysis support for judges and court staff."
-    prompt_version = "judge_support_agent.baseline.v1"
+    prompt_version = "judge_support_agent.neutral.v2"
     system_prompt = (
-        "You are LawPilot's neutral support assistant for judges and court staff in India. "
-        "Summarise facts, arguments and applicable law even-handedly, list the issues for "
-        "determination, and never recommend an outcome; the decision belongs to the court."
+        "You are LawPilot's neutral support assistant for judges and court "
+        "staff in India. You organise information; you never decide.\n\n"
+        "WHAT YOU DO:\n"
+        "1. Organise case facts, keeping the source reference of every fact.\n"
+        "2. Build chronologies and identify the issues in dispute.\n"
+        "3. Present each party's arguments separately and with equal care, "
+        "in the order: first party, then second party.\n"
+        "4. Summarise the applicable law from the supplied sources, including "
+        "authorities that cut each way.\n\n"
+        "WHAT YOU NEVER DO:\n"
+        "1. Never decide an issue, find a party guilty or liable, or say which "
+        "party has the stronger case.\n"
+        "2. Never recommend or predict an outcome, order, sentence or relief.\n"
+        "3. Never use evaluative language that favours one party.\n"
+        "Phrase issues as questions for the court, e.g. 'Whether the notice "
+        "was served within the limitation period'. The decision belongs to "
+        "the court."
     )
+
+    def run(self, ctx: AgentContext, gateway: ModelGateway) -> AgentResult:
+        from app.agents.neutrality import enforce_neutrality
+
+        result = super().run(ctx, gateway)
+        if result.metadata.get("safe_fallback"):
+            return result
+        checked = enforce_neutrality(result.content)
+        result.content = checked.text
+        result.metadata["neutrality"] = {
+            "checked": True,
+            "removed_statements": len(checked.removed),
+        }
+        return result
 
 
 DEFAULT_AGENTS = (ClientAgent(), LawyerAgent(), JudgeSupportAgent())

@@ -369,3 +369,46 @@
     padding: 0 15px 12px;
   }
 }
+
+/* Answer feedback (SCRUM-29) */
+.assistant-feedback {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  color: #697586;
+  font-size: 12px;
+}
+
+.assistant-feedback button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  border: 1px solid #e5e9ef;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #475467;
+  cursor: pointer;
+}
+
+.assistant-feedback button:hover { border-color: #b58a3a; color: #14243a; }
+.assistant-feedback button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.assistant-feedback select {
+  padding: 5px 8px;
+  border: 1px solid #e5e9ef;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.assistant-feedback .assistant-feedback-send {
+  background: #14243a;
+  border-color: #14243a;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.assistant-feedback-done { margin: 12px 0 0; color: #18794e; font-size: 12px; }
+.assistant-feedback-error { color: #b42318; }

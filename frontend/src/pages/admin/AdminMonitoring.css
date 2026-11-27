@@ -1,0 +1,22 @@
+.monitor-toolbar { display: flex; justify-content: flex-end; }
+.monitor-error { color: #912018; font-size: 12px; max-width: 320px; }
+
+.monitor-job { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #eef1f5; color: #475467; }
+.monitor-job-completed { background: #e7f6ee; color: #18794e; }
+.monitor-job-failed { background: #fdecec; color: #b42318; }
+.monitor-job-running { background: #e8eefc; color: #2948a3; }
+
+.monitor-source-row { cursor: pointer; }
+.monitor-source-row:hover td { background: #fafbfd; }
+
+.monitor-version { padding: 10px 12px; margin-bottom: 8px; border: 1px solid #e5e9ef; border-radius: 8px; background: #fafbfd; }
+.monitor-version-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.monitor-doc { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 4px 0 4px 8px; font-size: 13px; }
+
+.monitor-vstatus { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #eef1f5; color: #475467; }
+.monitor-vstatus-active { background: #e7f6ee; color: #18794e; }
+.monitor-vstatus-failed { background: #fdecec; color: #b42318; }
+.monitor-vstatus-withdrawn { background: #fdecec; color: #b42318; }
+.monitor-vstatus-pending { background: #fff4e0; color: #a15c07; }
+
+.monitor-cases { margin-top: 12px; }

@@ -187,7 +187,12 @@ Never commit actual credentials, passwords, or API keys to version control.
 
 ## 9. Project Status
 
-**Current stage:** Sprint 3 in progress: LLM and agent integration.
+**Current stage:** Sprint 4, system validation: MVP feature-complete, release checklist in progress.
+
+Full documentation is in [`docs/`](docs/README.md): [setup](docs/SETUP.md),
+[configuration](docs/CONFIGURATION.md), [API](docs/API.md), [migrations](docs/MIGRATIONS.md),
+[evaluation](docs/EVALUATION.md), [test report](docs/TEST_REPORT.md) and
+[release checklist and rollback](docs/RELEASE.md).
 
 | Area | Status | Details |
 |---|---|---|
@@ -202,7 +207,14 @@ Never commit actual credentials, passwords, or API keys to version control.
 | Ollama + Qwen integration and model evaluation | Done (SCRUM-19) | [`backend/app/llm/README.md`](backend/app/llm/README.md), `GET /api/v1/health/llm`, `backend/scripts/evaluate_model.py` |
 | Model Gateway (timeouts, retries, fallback, `model_runs` logging) | Done (SCRUM-20) | `backend/app/llm/gateway.py` |
 | LangGraph orchestrator (classification, routing, role permissions, handoffs) | Done (SCRUM-21) | [`backend/app/orchestration/README.md`](backend/app/orchestration/README.md), `POST /api/v1/assistant/chat` |
-| Client, Lawyer, Judge Support agents | Baseline agents in place; full agents in SCRUM-22/23/25 | `backend/app/agents/` |
-| Frontend screens for the assistant | Next | SCRUM-28 |
+| Client and Lawyer agents | Done (SCRUM-22/23) | `backend/app/agents/default_agents.py` |
+| Legal drafts with second-lawyer approval, matters and reviewers | Done (SCRUM-24) | `/api/v1/drafts`, `/api/v1/matters` |
+| Judge Support Agent: neutral case brief, neutrality guard | Done (SCRUM-25) | `/api/v1/judge-support/case-brief`, `backend/app/agents/case_brief.py` |
+| Citation verification against stored sources | Done (SCRUM-26) | `backend/app/verification/`, `/api/v1/citations/verify` |
+| Safe responses: reliability flag, conflicting sources, no leaked errors or secrets | Done (SCRUM-27) | `backend/app/safety/` |
+| Frontend: role workspaces, drafts, judge brief, verified citations | Done (SCRUM-28) | `frontend/src/pages/` |
+| Admin monitoring: ingestion, versions and indexing, evaluation, feedback | Done (SCRUM-29) | `/admin/monitoring`, `/api/v1/admin/evaluation/*` |
+| System and security testing (464 tests pass) | Done (SCRUM-30) | [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) |
+| Documentation and release preparation | Done; checklist to run on the release PC (SCRUM-31) | [`docs/RELEASE.md`](docs/RELEASE.md) |
 
 Uploading a document starts a background pipeline: extraction → chunking → indexing → activation. When it finishes, the document is searchable.

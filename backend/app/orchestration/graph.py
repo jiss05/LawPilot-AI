@@ -36,6 +36,8 @@ from app.llm.gateway import ModelGateway, get_model_gateway
 from app.llm.types import ModelError
 from app.orchestration import permissions
 from app.orchestration.classifier import RequestClassifier
+from app.safety.responses import assess_reliability, conflict_note, detect_conflicts
+from app.verification.citations import stored_sources_from_retrieved, verify_citations
 from app.orchestration.state import (
     INTENT_CASE_ANALYSIS,
     INTENT_DOCUMENT_DRAFTING,
@@ -127,6 +129,10 @@ class LegalOrchestrator:
             "handoff_count": 0,
             "citations": [],
             "status": STATUS_COMPLETED,
+            "reliable": False,
+            "notice": None,
+            "verification": {},
+            "conflicts": [],
         }
         config = {"configurable": {"retriever": retriever or self.retriever}}
         try:
@@ -134,7 +140,8 @@ class LegalOrchestrator:
         except Exception:  # last line of defence: the graph itself broke
             logger.exception("Orchestrator crashed request_id=%s", initial["request_id"])
             final = {**initial, "answer": FAILED_MESSAGE, "status": STATUS_FAILED,
-                     "errors": [{"step": "graph", "code": "internal_error"}], "trace": ["graph_failed"]}
+                     "errors": [{"step": "graph", "code": "internal_error"}], "trace": ["graph_failed"],
+                     **_unreliable(STATUS_FAILED)}
         logger.info(
             "orchestrator request_id=%s intent=%s agent=%s status=%s handoffs=%s trace=%s",
             final.get("request_id"), final.get("intent"), final.get("answered_by"),
@@ -239,6 +246,7 @@ class LegalOrchestrator:
             handoff_from=last_handoff["from"] if last_handoff and last_handoff.get("accepted") else None,
             handoff_reason=last_handoff["reason"] if last_handoff and last_handoff.get("accepted") else None,
             previous_outputs=list(previous),
+            retrieval_failed="retrieval_unavailable" in state.get("warnings", []),
         )
         try:
             result: AgentResult = agent.run(ctx, self.gateway)
@@ -296,7 +304,8 @@ class LegalOrchestrator:
         if not outputs:
             # No agent produced anything (model unavailable on the first agent).
             return {"answer": MODEL_UNAVAILABLE_MESSAGE, "answered_by": None, "citations": [],
-                    "status": STATUS_DEGRADED, "trace": ["finalize:no_answer"]}
+                    "status": STATUS_DEGRADED, "trace": ["finalize:no_answer"],
+                    **_unreliable(STATUS_DEGRADED, warnings)}
         final = outputs[-1]
         answer = final["content"]
         denied = [h for h in state.get("handoffs", []) if not h.get("accepted")]
@@ -318,26 +327,63 @@ class LegalOrchestrator:
             )
             else STATUS_COMPLETED
         )
-        return {"answer": answer, "answered_by": final["agent"],
-                "citations": final.get("citations", []), "status": status, "trace": ["finalize"]}
+
+        # SCRUM-26: check every citation against the stored sources.
+        # SCRUM-27: flag conflicting sources; decide whether the answer is reliable.
+        sources = state.get("sources", [])
+        citations = final.get("citations", [])
+        report = verify_citations(answer, citations, stored_sources_from_retrieved(sources))
+        conflicts = detect_conflicts(sources)
+        answer += conflict_note(conflicts)
+        reliability = assess_reliability(
+            status=status,
+            citations=citations,
+            verification=report,
+            conflicts=conflicts,
+            warnings=warnings,
+            safe_fallback=bool(final.get("metadata", {}).get("safe_fallback")),
+        )
+        update = {"answer": answer, "answered_by": final["agent"],
+                  "citations": report.annotate(citations), "status": status,
+                  "verification": report.summary(), "conflicts": conflicts,
+                  "reliable": reliability.reliable, "notice": reliability.notice,
+                  "trace": ["finalize"]}
+        if report.has_failures:
+            update["warnings"] = ["citation_verification_failed"]
+        if report.unsupported_mentions:
+            update.setdefault("warnings", []).append("unsupported_provisions")
+        if conflicts:
+            update.setdefault("warnings", []).append("conflicting_sources")
+        return update
 
     def _reject(self, state: OrchestratorState) -> dict:
         if state.get("status") == STATUS_FORBIDDEN:
             answer = "You do not have access to that assistant."
         else:
             answer = OUT_OF_SCOPE_MESSAGE
-        return {"answer": answer, "answered_by": None, "citations": [], "trace": ["reject"]}
+        return {"answer": answer, "answered_by": None, "citations": [], "trace": ["reject"],
+                **_unreliable(state.get("status") or STATUS_REJECTED)}
 
     def _fail_safe(self, state: OrchestratorState) -> dict:
-        # Keep a partial answer from an earlier agent if one exists.
+        # Keep a partial answer from an earlier agent if one exists, but never
+        # present it as reliable.
         outputs = state.get("agent_outputs", [])
         if outputs:
             last = outputs[-1]
+            citations = [
+                {**c, "verification_status": "unverified", "verification_issues": [],
+                 "verification_details": []}
+                for c in last.get("citations", [])
+            ]
             return {"answer": last["content"], "answered_by": last["agent"],
-                    "citations": last.get("citations", []), "status": STATUS_DEGRADED,
-                    "trace": ["fail_safe:partial"]}
+                    "citations": citations, "status": STATUS_DEGRADED,
+                    "trace": ["fail_safe:partial"],
+                    "reliable": False,
+                    "notice": ("Something went wrong while checking this answer, so it is "
+                               "incomplete and its citations are unverified. Do not rely on it "
+                               "without independent verification.")}
         return {"answer": FAILED_MESSAGE, "answered_by": None, "citations": [],
-                "status": STATUS_FAILED, "trace": ["fail_safe"]}
+                "status": STATUS_FAILED, "trace": ["fail_safe"], **_unreliable(STATUS_FAILED)}
 
     # ---- edges -------------------------------------------------------- #
     @staticmethod
@@ -375,6 +421,13 @@ def _guard(step: str, fn):
                     "trace": [f"{step}:error"]}
 
     return wrapper
+
+
+def _unreliable(status: str, warnings=()) -> dict:
+    """State keys for an answer that must not be presented as reliable."""
+    r = assess_reliability(status=status, citations=[], verification=None,
+                           conflicts=[], warnings=warnings, safe_fallback=True)
+    return {"reliable": False, "notice": r.notice, "verification": {}, "conflicts": []}
 
 
 def _failed(state: OrchestratorState) -> bool:

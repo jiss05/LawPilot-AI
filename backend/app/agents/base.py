@@ -38,6 +38,9 @@ class AgentContext:
     handoff_from: str | None = None
     handoff_reason: str | None = None
     previous_outputs: list[dict[str, Any]] = field(default_factory=list)
+    # True when the knowledge base could not be searched (SCRUM-27), so an
+    # empty `sources` list means "unknown", not "no relevant law".
+    retrieval_failed: bool = False
 
 
 @dataclass

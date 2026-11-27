@@ -1,23 +1,31 @@
+import { useState } from 'react'
+import AssistantChat from '../../components/AssistantChat'
+import CaseBrief from './CaseBrief'
+import '../../components/Workspace.css'
 
 function JudgeDashboard() {
+  const [tab, setTab] = useState('brief')
+
   return (
-    <div className="role-dashboard-page">
-      <div className="role-dashboard-heading">
-        <h1>Judge Dashboard</h1>
+    <div className="ws-page">
+      <div className="ws-heading">
+        <h1>Judge Support Workspace</h1>
         <p>
-          Welcome to your judicial support workspace.
+          Organise case facts, chronology, issues and each party&apos;s arguments with their
+          sources. LawPilot never decides a case or recommends an outcome.
         </p>
       </div>
 
-      <div className="role-welcome-card">
-        <h2>Welcome to LawPilot AI</h2>
-        <p>
-          Your judicial research workspace. You will be
-          able to access relevant legal materials,
-          judgments, and structured legal information
-          to support judicial research.
-        </p>
+      <div className="ws-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === 'brief'} className={`ws-tab ${tab === 'brief' ? 'active' : ''}`} onClick={() => setTab('brief')}>
+          Case brief
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'chat'} className={`ws-tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>
+          Assistant
+        </button>
       </div>
+
+      {tab === 'brief' ? <CaseBrief /> : <AssistantChat agent="judge_support" />}
     </div>
   )
 }

@@ -390,3 +390,14 @@
     font-size: 35px;
   }
 }
+
+/* Route guard (RequireRole) */
+.route-guard-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 100vh;
+  color: #697586;
+  font-size: 14px;
+}

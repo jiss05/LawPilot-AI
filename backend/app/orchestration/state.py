@@ -69,6 +69,11 @@ class OrchestratorState(TypedDict, total=False):
     citations: list[dict[str, Any]]
     model_run_ids: Annotated[list[str], operator.add]
     status: str
+    # SCRUM-26/27: citation verification, conflicting sources, reliability.
+    verification: dict[str, Any]
+    conflicts: list[dict[str, Any]]
+    reliable: bool
+    notice: str | None
     warnings: Annotated[list[str], operator.add]
     errors: Annotated[list[dict[str, str]], operator.add]
     trace: Annotated[list[str], operator.add]

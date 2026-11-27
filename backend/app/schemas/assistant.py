@@ -1,5 +1,6 @@
 """Request/response models for /api/v1/assistant (SCRUM-21 orchestrator)."""
 
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -22,6 +23,12 @@ class Citation(BaseModel):
     source_title: str | None = None
     citation: str | None = None
     url: str | None = None
+    page_number: int | None = None
+    section_ref: str | None = None
+    # SCRUM-26: verified | failed | not_cited | unverified
+    verification_status: str = "unverified"
+    verification_issues: list[str] = []
+    verification_details: list[str] = []
 
 
 class Handoff(BaseModel):
@@ -37,7 +44,13 @@ class Handoff(BaseModel):
 class ChatResponse(BaseModel):
     request_id: str
     conversation_id: UUID | None
+    # The saved assistant answer; use it to send feedback (SCRUM-29).
+    message_id: UUID | None = None
     status: str                      # completed | degraded | rejected | failed
+    # SCRUM-27: only True for a completed answer whose citations all verified
+    # and whose sources do not conflict. `notice` says why when it is False.
+    reliable: bool = False
+    notice: str | None = None
     answer: str
     answered_by: str | None
     intent: str | None
@@ -45,6 +58,8 @@ class ChatResponse(BaseModel):
     citations: list[Citation] = []
     handoffs: list[Handoff] = []
     warnings: list[str] = []
+    verification: dict[str, Any] = {}
+    conflicts: list[dict[str, Any]] = []
     trace: list[str] = []
 
 

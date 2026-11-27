@@ -16,16 +16,19 @@ import AdminOverview from './pages/admin/AdminOverview.jsx'
 import AdminUsers from './pages/admin/AdminUsers.jsx'
 import AdminLegalSources from './pages/admin/AdminLegalSources.jsx'
 import AdminProfile from './pages/admin/AdminProfile.jsx'
+import AdminMonitoring from './pages/admin/AdminMonitoring.jsx'
 
 // Shared role components
 import RoleLayout from './components/RoleLayout.jsx'
 import RoleProfile from './components/RoleProfile.jsx'
+import RequireRole from './components/RequireRole.jsx'
 
 // Client pages
 import ClientDashboard from './pages/client/ClientDashboard.jsx'
 
 // Lawyer pages
 import LawyerDashboard from './pages/lawyer/LawyerDashboard.jsx'
+import LawyerDrafts from './pages/lawyer/LawyerDrafts.jsx'
 
 // Judge pages
 import JudgeDashboard from './pages/judge/JudgeDashboard.jsx'
@@ -44,17 +47,29 @@ function App() {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
 
         {/* Admin dashboard */}
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route
+          path="/admin"
+          element={
+            <RequireRole role="ADMIN">
+              <AdminLayout />
+            </RequireRole>
+          }
+        >
           <Route index element={<AdminOverview />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="legal-sources" element={<AdminLegalSources />} />
+          <Route path="monitoring" element={<AdminMonitoring />} />
           <Route path="profile" element={<AdminProfile />} />
         </Route>
 
         {/* Client dashboard */}
         <Route
           path="/client"
-          element={<RoleLayout role="client" />}
+          element={
+            <RequireRole role="CLIENT">
+              <RoleLayout role="client" />
+            </RequireRole>
+          }
         >
           <Route index element={<ClientDashboard />} />
           <Route path="profile" element={<RoleProfile />} />
@@ -63,16 +78,25 @@ function App() {
         {/* Lawyer dashboard */}
         <Route
           path="/lawyer"
-          element={<RoleLayout role="lawyer" />}
+          element={
+            <RequireRole role="LAWYER">
+              <RoleLayout role="lawyer" />
+            </RequireRole>
+          }
         >
           <Route index element={<LawyerDashboard />} />
+          <Route path="drafts" element={<LawyerDrafts />} />
           <Route path="profile" element={<RoleProfile />} />
         </Route>
 
         {/* Judge dashboard */}
         <Route
           path="/judge"
-          element={<RoleLayout role="judge" />}
+          element={
+            <RequireRole role="JUDGE">
+              <RoleLayout role="judge" />
+            </RequireRole>
+          }
         >
           <Route index element={<JudgeDashboard />} />
           <Route path="profile" element={<RoleProfile />} />

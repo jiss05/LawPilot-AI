@@ -216,9 +216,12 @@ def test_retrieval_failure_returns_safe_response():
     )
 
     assert state["status"] == "degraded"
-    assert "could not find supporting legal authorities" in state["answer"].lower()
+    # SCRUM-27: say the knowledge base was unavailable, not "nothing found".
+    assert "could not be searched" in state["answer"].lower()
     assert "retrieval_unavailable" in state["warnings"]
     assert state["citations"] == []
+    assert state["reliable"] is False
+    assert state["notice"]
     assert gw.provider.calls == []
 
 def test_model_unavailable_gives_safe_message():

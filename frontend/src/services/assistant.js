@@ -30,3 +30,14 @@ export async function sendAssistantMessage({
 
   return response.data
 }
+
+/** Rate an assistant answer (SCRUM-29). rating 1-5. */
+export async function sendFeedback({ messageId, rating, issueType = null, comment = null }) {
+  const response = await api.post('/assistant/feedback', {
+    message_id: messageId,
+    rating,
+    issue_type: issueType,
+    comment,
+  })
+  return response.data
+}
