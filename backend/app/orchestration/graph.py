@@ -36,8 +36,17 @@ from app.llm.gateway import ModelGateway, get_model_gateway
 from app.llm.types import ModelError
 from app.orchestration import permissions
 from app.orchestration.classifier import RequestClassifier
-from app.safety.responses import assess_reliability, conflict_note, detect_conflicts
-from app.verification.citations import stored_sources_from_retrieved, verify_citations
+from app.safety.responses import (
+    NO_ANSWER_MESSAGE,
+    assess_reliability,
+    conflict_note,
+    detect_conflicts,
+)
+from app.verification.citations import (
+    referenced_numbers,
+    stored_sources_from_retrieved,
+    verify_citations,
+)
 from app.orchestration.state import (
     INTENT_CASE_ANALYSIS,
     INTENT_DOCUMENT_DRAFTING,
@@ -333,6 +342,20 @@ class LegalOrchestrator:
         sources = state.get("sources", [])
         citations = final.get("citations", [])
         report = verify_citations(answer, citations, stored_sources_from_retrieved(sources))
+
+        # Hard grounding gate: the prompt alone does not stop a small model
+        # from answering from memory. If the answer names law that is not in
+        # the retrieved sources, or cites none of them, it is not shown:
+        # the user gets "No answer available" instead. Drafts are exempt
+        # (they go through second-lawyer review and keep their warnings).
+        blocked = self._ungrounded(state, final, report)
+        if blocked:
+            return {"answer": NO_ANSWER_MESSAGE, "answered_by": final["agent"],
+                    "citations": [], "status": STATUS_COMPLETED,
+                    "verification": report.summary(), "conflicts": [],
+                    "reliable": False, "notice": None,
+                    "warnings": blocked, "trace": ["finalize:no_grounded_answer"]}
+
         conflicts = detect_conflicts(sources)
         answer += conflict_note(conflicts)
         reliability = assess_reliability(
@@ -355,6 +378,19 @@ class LegalOrchestrator:
         if conflicts:
             update.setdefault("warnings", []).append("conflicting_sources")
         return update
+
+    @staticmethod
+    def _ungrounded(state: OrchestratorState, final: dict, report) -> list[str]:
+        """Warnings explaining why an answer must be withheld; [] if it is grounded."""
+        if final.get("metadata", {}).get("safe_fallback"):
+            return []  # already a safe message (no evidence / no answer / unavailable)
+        if state.get("intent") == INTENT_DOCUMENT_DRAFTING:
+            return []
+        if report.unsupported_mentions:
+            return ["ungrounded_answer_blocked", "unsupported_provisions"]
+        if not referenced_numbers(final.get("content", "")):
+            return ["ungrounded_answer_blocked", "no_source_cited"]
+        return []
 
     def _reject(self, state: OrchestratorState) -> dict:
         if state.get("status") == STATUS_FORBIDDEN:

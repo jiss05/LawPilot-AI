@@ -54,6 +54,7 @@ Frontend: `cd frontend && npm run lint && npm run build`.
 | D12 | Low | `app/db/session.py` calls `load_dotenv()`, which copies `.env` into the process environment (cause of D7) | Open |
 | D13 | Low | Access token is kept in `localStorage`, readable by any injected script | Accepted risk for MVP |
 | D14 | Low | 4 lint errors (setState inside effects) in `AdminLegalSources`, `AdminOverview`, `AdminUsers` (existed before this sprint) | Open |
+| D15 | High | Assistant answered from model memory when the uploaded documents did not cover the question (e.g. named IPC s.302 / BNS s.262 with only Contract Act sources) | Fixed: source-only prompt with a `NO_ANSWER_AVAILABLE` signal, plus a hard gate that replaces any answer naming law not in the sources, or citing no source, with "No answer available" (`tests/safety/test_grounding_gate.py`) |
 
 ## Not yet run
 

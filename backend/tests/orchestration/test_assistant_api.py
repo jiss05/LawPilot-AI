@@ -49,7 +49,7 @@ class FakeSession:
 @pytest.fixture
 def setup(monkeypatch):
     session = FakeSession()
-    gw = ModelGateway(ModelSettings(provider="fake"), provider=FakeProvider(["Model answer"]),
+    gw = ModelGateway(ModelSettings(provider="fake"), provider=FakeProvider(["Model answer [1]"]),
                       recorder=InMemoryRunRecorder())
     orch = LegalOrchestrator(gateway=gw, classifier=RequestClassifier(gw, use_model=False))
     monkeypatch.setattr(
@@ -98,7 +98,7 @@ def test_chat_answers_and_saves_conversation(setup):
                     headers={"X-Request-ID": "abc-123"})
     assert r.status_code == 200
     body = r.json()
-    assert body["answer"] == "Model answer" and body["answered_by"] == "client"
+    assert body["answer"] == "Model answer [1]" and body["answered_by"] == "client"
     assert body["status"] == "completed" and body["request_id"] == "abc-123"
     assert body["conversation_id"] is not None
     kinds = [type(o).__name__ for o in session.added]
@@ -119,5 +119,5 @@ def test_saving_failure_still_returns_answer(setup):
     session.commit = lambda: (_ for _ in ()).throw(RuntimeError("db down"))
     body = client.post("/api/v1/assistant/chat",
                        json={"message": "Explain bail", "use_knowledge_base": True}).json()
-    assert body["answer"] == "Model answer"
+    assert body["answer"] == "Model answer [1]"
     assert "conversation_not_saved" in body["warnings"]

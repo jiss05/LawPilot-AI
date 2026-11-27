@@ -35,6 +35,18 @@ RETRIEVAL_UNAVAILABLE_MESSAGE = (
     "problem continues, contact the administrator with the request ID."
 )
 
+# Shown instead of an answer when the uploaded legal documents do not cover
+# the question (the model said so, or its answer was not grounded in them).
+NO_ANSWER_MESSAGE = (
+    "No answer available. The legal documents uploaded to LawPilot do not "
+    "cover this question, so I cannot answer it without guessing. Please "
+    "rephrase the question, or ask the administrator to upload the relevant "
+    "law. For advice on a specific situation, consult a qualified advocate."
+)
+
+# Exact token the model is told to output when the sources do not answer.
+NO_ANSWER_TOKEN = "NO_ANSWER_AVAILABLE"
+
 # Similarity below which two texts for the same provision "conflict".
 CONFLICT_SIMILARITY = 0.6
 

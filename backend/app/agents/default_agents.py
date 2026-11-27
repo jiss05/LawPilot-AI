@@ -24,7 +24,11 @@ from app.agents.base import (
 )
 from app.llm.gateway import ModelGateway
 from app.llm.types import ChatMessage, GenerationRequest
-from app.safety.responses import RETRIEVAL_UNAVAILABLE_MESSAGE
+from app.safety.responses import (
+    NO_ANSWER_MESSAGE,
+    NO_ANSWER_TOKEN,
+    RETRIEVAL_UNAVAILABLE_MESSAGE,
+)
 from app.orchestration.state import (
     INTENT_CASE_ANALYSIS,
     INTENT_DOCUMENT_DRAFTING,
@@ -36,6 +40,20 @@ MAX_SOURCE_CHARS = 1200
 
 
 _GROUNDING = (
+    "ANSWER ONLY FROM THE SOURCES (MOST IMPORTANT RULE):\n"
+    "You have no legal knowledge of your own. The numbered SOURCES below are "
+    "the ONLY law you know. Before writing anything, check: do the SOURCES "
+    "directly answer this exact question?\n"
+    f"If they do not, reply with exactly {NO_ANSWER_TOKEN} and nothing "
+    "else. Do this when the SOURCES are about a different subject, only "
+    "share a keyword with the question, or only partly answer it.\n"
+    "Never mention, suggest or correct towards any Act, Code, section or "
+    "case that is not written in the SOURCES, not even to say it 'may "
+    "apply'. Do not add practical steps or advice that the SOURCES do not "
+    "support.\n"
+    "Every legal statement in your answer must end with its source number, "
+    "for example [1]. An answer without source numbers is discarded.\n\n"
+
     "STRICT LEGAL EVIDENCE RULES:\n"
     "Use only the numbered SOURCES supplied in this request as evidence "
     "for legal claims, statutory provisions, case law and legal procedures.\n"
@@ -55,9 +73,8 @@ _GROUNDING = (
     "is checked against the sources, and an answer naming unsupported law is "
     "rejected as unreliable.\n"
     "If none of the SOURCES is actually about the question (for example they "
-    "share a word but concern a different subject), say that the available "
-    "legal sources do not cover this question and stop; do not answer from "
-    "general knowledge.\n"
+    f"share a word but concern a different subject), reply only with "
+    f"{NO_ANSWER_TOKEN}; do not answer from general knowledge.\n"
     "If two supplied sources disagree (for example two editions of the same "
     "provision), say so explicitly and cite both; do not silently pick one.\n\n"
 
@@ -193,6 +210,21 @@ class PromptAgent:
 
         handoff_to, reason = self.handoff(ctx)
 
+        # The model said the sources do not answer the question.
+        if NO_ANSWER_TOKEN in (result.text or ""):
+            return AgentResult(
+                content=NO_ANSWER_MESSAGE,
+                citations=[],
+                model_run_id=result.run_id,
+                metadata={
+                    "model": result.model,
+                    "duration_ms": result.duration_ms,
+                    "evidence": "insufficient",
+                    "safe_fallback": True,
+                    "no_answer": True,
+                },
+            )
+
         return AgentResult(
             content=result.text,
             citations=citations_for(ctx.sources),
@@ -221,9 +253,9 @@ class ClientAgent(PromptAgent):
         "the answer.\n"
         "Do not add generic advice, lengthy background, repeated conclusions "
         "or an advocate disclaimer to ordinary factual questions.\n"
-        "Suggest practical next steps or consulting a qualified advocate "
-        "when the user describes a specific dispute, needs case-specific "
-        "guidance or faces an important legal decision.\n"
+        "When the user describes a specific dispute or needs case-specific "
+        "guidance, you may suggest consulting a qualified advocate, but give "
+        "no practical steps that the SOURCES do not support.\n"
         "Do not present general information as a definitive legal opinion."
     )
 
